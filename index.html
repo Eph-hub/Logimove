@@ -14,7 +14,8 @@
         .saved-place-item { background: #f1f5f9; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; display: inline-block; margin: 2px; }
         button:active { transform: scale(0.97); }
         .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
-        .star-rating { color: gold; cursor: pointer; }
+        .star-rating { color: gray; cursor: pointer; font-size: 1.2rem; }
+        .star-rating.active { color: gold; }
         .notification-bell { position: fixed; bottom: 20px; right: 20px; background: #ef4444; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; }
     </style>
 </head>
@@ -41,6 +42,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const messaging = getMessaging(app);
+
+        // ---------- VAPID KEY (provided) ----------
+        const VAPID_KEY = "BA9DpLjj3iXB42GTsGrmu_Cv41BubNylrMcLYmnBBXTi4ib5pSUl46-tkskKk35URzS6-1NlYDA13fNGNTcBJVI";
 
         // ---------- GLOBALS ----------
         let currentUser = null;
@@ -84,31 +88,38 @@
             return rounded;
         }
 
-        // ---------- NOTIFICATIONS ----------
+        // ---------- NOTIFICATIONS (with provided VAPID key) ----------
         async function initNotifications() {
             if (fcmToken) return;
             try {
                 const permission = await Notification.requestPermission();
-                if (permission !== 'granted') return;
-                const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' });
-                // For actual VAPID, you need to generate from Firebase console -> Project settings -> Cloud Messaging.
-                // Without VAPID, we fallback to browser notifications using our own logic.
+                if (permission !== 'granted') {
+                    console.log("Notification permission denied");
+                    return;
+                }
+                // Request token with VAPID key
+                const token = await getToken(messaging, { vapidKey: VAPID_KEY });
                 if (token) {
                     fcmToken = token;
                     if (currentUser) await setDoc(doc(db, "fcmTokens", currentUser.uid), { token, role: currentRole }, { merge: true });
+                    console.log("FCM token obtained");
+                } else {
+                    console.log("No registration token available.");
                 }
-            } catch(e) { console.warn("FCM not supported, using alert fallback"); }
+            } catch(e) {
+                console.warn("FCM error, using fallback alerts", e);
+            }
         }
 
         function showNotification(title, body) {
             if (Notification.permission === 'granted') {
-                new Notification(title, { body, icon: '/favicon.ico' });
+                new Notification(title, { body, icon: 'https://via.placeholder.com/64?text=LM' });
             } else {
                 alert(`${title}: ${body}`);
             }
         }
 
-        // Listen for messages while app is open
+        // Listen for foreground messages
         onMessage(messaging, (payload) => {
             showNotification(payload.notification.title, payload.notification.body);
         });
@@ -118,7 +129,6 @@
             await setDoc(doc(db, "ratings", requestId), {
                 driverId, rating, comment, timestamp: serverTimestamp(), requestId
             });
-            // Update driver's average rating
             const ratingsSnap = await getDocs(query(collection(db, "ratings"), where("driverId", "==", driverId)));
             let total = 0, count = 0;
             ratingsSnap.forEach(d => { total += d.data().rating; count++; });
@@ -536,7 +546,7 @@
             // Driver history
             const myCompleted = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
             const historyDiv = document.getElementById('driverHistoryList');
-            historyDiv.innerHTML = myCompleted.length ? myCompleted.map(r => `<div class="border-b p-1 text-sm">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} | ${r.customerName} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No completed trips yet</div>';
+            historyDiv.innerHTML = myCompleted.length? myCompleted.map(r => `<div class="border-b p-1 text-sm">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} | ${r.customerName} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No completed trips yet</div>';
         }
 
         // ---------- MAIN ENTRY ----------
