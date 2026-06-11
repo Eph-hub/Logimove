@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiMove Zambia - Live</title>
+    <title>LogiMove Zambia - Complete Logistics Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,16 +14,19 @@
         .saved-place-item { background: #f1f5f9; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; display: inline-block; margin: 2px; }
         button:active { transform: scale(0.97); }
         .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
+        .star-rating { color: gold; cursor: pointer; }
+        .notification-bell { position: fixed; bottom: 20px; right: 20px; background: #ef4444; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; }
     </style>
 </head>
 <body class="bg-slate-100">
     <div id="appContainer" class="max-w-7xl mx-auto p-4">Loading...</div>
 
     <script type="module">
-        // ---------- FIREBASE (using your working config) ----------
+        // ---------- FIREBASE IMPORTS ----------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB5hxpRq8WJ5f6EmNZPw-3II6910CXk4Z4",
@@ -37,6 +40,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const messaging = getMessaging(app);
 
         // ---------- GLOBALS ----------
         let currentUser = null;
@@ -50,12 +54,14 @@
         let unsubscribeRequests = null;
         let driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null };
         let mapSelectMode = "pickup";
+        let fcmToken = null;
 
         // Pricing (ZMW)
         const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
         const CURRENCY = "K";
         const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
 
+        // Helper functions
         function haversine(lat1, lng1, lat2, lng2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -75,9 +81,83 @@
             if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
             const autoSpan = document.getElementById('autoPriceDisplay');
             if (autoSpan) autoSpan.innerText = `${CURRENCY}${rounded}`;
+            return rounded;
         }
 
-        // ---------- RENDER LOGIN ----------
+        // ---------- NOTIFICATIONS ----------
+        async function initNotifications() {
+            if (fcmToken) return;
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') return;
+                const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' });
+                // For actual VAPID, you need to generate from Firebase console -> Project settings -> Cloud Messaging.
+                // Without VAPID, we fallback to browser notifications using our own logic.
+                if (token) {
+                    fcmToken = token;
+                    if (currentUser) await setDoc(doc(db, "fcmTokens", currentUser.uid), { token, role: currentRole }, { merge: true });
+                }
+            } catch(e) { console.warn("FCM not supported, using alert fallback"); }
+        }
+
+        function showNotification(title, body) {
+            if (Notification.permission === 'granted') {
+                new Notification(title, { body, icon: '/favicon.ico' });
+            } else {
+                alert(`${title}: ${body}`);
+            }
+        }
+
+        // Listen for messages while app is open
+        onMessage(messaging, (payload) => {
+            showNotification(payload.notification.title, payload.notification.body);
+        });
+
+        // ---------- RATINGS ----------
+        async function rateDriver(requestId, driverId, rating, comment) {
+            await setDoc(doc(db, "ratings", requestId), {
+                driverId, rating, comment, timestamp: serverTimestamp(), requestId
+            });
+            // Update driver's average rating
+            const ratingsSnap = await getDocs(query(collection(db, "ratings"), where("driverId", "==", driverId)));
+            let total = 0, count = 0;
+            ratingsSnap.forEach(d => { total += d.data().rating; count++; });
+            const avg = total / count;
+            await updateDoc(doc(db, "drivers", driverId), { averageRating: avg, ratingsCount: count });
+            alert("Thank you for rating!");
+        }
+
+        // ---------- ADMIN PANEL ----------
+        async function renderAdminPanel() {
+            const usersSnap = await getDocs(collection(db, "users"));
+            const driversSnap = await getDocs(collection(db, "drivers"));
+            const requestsSnap = await getDocs(collection(db, "requests"));
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <div class="flex justify-between"><h2 class="text-xl font-bold">👑 Admin Dashboard</h2><button id="adminLogout" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
+                    <div class="grid md:grid-cols-3 gap-4 mt-4">
+                        <div class="bg-blue-50 p-3 rounded">👥 Users: ${usersSnap.size}</div>
+                        <div class="bg-green-50 p-3 rounded">🚚 Drivers: ${driversSnap.size}</div>
+                        <div class="bg-amber-50 p-3 rounded">📦 Requests: ${requestsSnap.size}</div>
+                    </div>
+                    <div class="mt-4"><h3 class="font-bold">All Requests</h3><div id="adminRequestsList" class="max-h-64 overflow-auto"></div></div>
+                    <div class="mt-4"><h3 class="font-bold">All Drivers & Ratings</h3><div id="adminDriversList" class="max-h-64 overflow-auto"></div></div>
+                </div>`;
+            const reqList = document.getElementById('adminRequestsList');
+            reqList.innerHTML = allRequests.map(req => `<div class="border-b p-2">#${req.id.substring(0,6)} ${req.type} - ${req.status} - ${CURRENCY}${req.price}</div>`).join('');
+            const driversList = document.getElementById('adminDriversList');
+            const driversData = [];
+            for (const d of driversSnap.docs) {
+                const userDoc = await getDoc(doc(db, "users", d.id));
+                const email = userDoc.exists() ? userDoc.data().email : d.id;
+                driversData.push(`<div class="border-b p-2">${email} | Rating: ${d.data().averageRating?.toFixed(1) || 'N/A'} (${d.data().ratingsCount||0} reviews)</div>`);
+            }
+            driversList.innerHTML = driversData.join('');
+            document.getElementById('adminLogout').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
+        }
+
+        // ---------- LOGIN & REGISTRATION ----------
         function renderLogin() {
             document.getElementById('appContainer').innerHTML = `
                 <div class="min-h-screen flex items-center justify-center p-4">
@@ -90,7 +170,6 @@
                         <div id="driverRegForm" class="hidden mt-2 space-y-2"><input type="text" id="drvName" placeholder="Full name" class="w-full border rounded-lg p-1"><input type="email" id="drvEmail" placeholder="Email" class="w-full border rounded-lg p-1"><input type="password" id="drvPwd" placeholder="Password" class="w-full border rounded-lg p-1"><button id="doDriverReg" class="bg-amber-500 text-white py-1 rounded-lg">Register & Login</button></div></div>
                     </div>
                 </div>`;
-            // attach events
             document.getElementById('loginBtn').onclick = async () => {
                 const email = document.getElementById('loginEmail').value.trim();
                 const pwd = document.getElementById('loginPassword').value;
@@ -98,6 +177,7 @@
                     const cred = await signInWithEmailAndPassword(auth, email, pwd);
                     currentUser = cred.user;
                     await loadUserData(currentUser.uid);
+                    await initNotifications();
                     startApp();
                 } catch(e) { alert("Login error: " + e.message); }
             };
@@ -115,6 +195,7 @@
                     await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "customer", createdAt: serverTimestamp() });
                     currentUser = cred.user;
                     await loadUserData(currentUser.uid);
+                    await initNotifications();
                     startApp();
                 } catch(e) { alert("Reg error: " + e.message); }
             };
@@ -126,9 +207,10 @@
                 try {
                     const cred = await createUserWithEmailAndPassword(auth, email, pwd);
                     await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "driver", createdAt: serverTimestamp() });
-                    await setDoc(doc(db, "drivers", cred.user.uid), { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null });
+                    await setDoc(doc(db, "drivers", cred.user.uid), { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null, averageRating: 0, ratingsCount: 0 });
                     currentUser = cred.user;
                     await loadUserData(currentUser.uid);
+                    await initNotifications();
                     startApp();
                 } catch(e) { alert("Reg error: " + e.message); }
             };
@@ -154,6 +236,7 @@
                 allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (currentRole === "customer") refreshCustomerUI();
                 else if (currentRole === "driver") refreshDriverUI();
+                else if (currentRole === "admin") renderAdminPanel();
             });
         }
 
@@ -256,6 +339,7 @@
                 };
                 await addDoc(collection(db, "requests"), req);
                 alert("Request published!");
+                showNotification("Request Published", "Drivers can now see your request.");
             };
             document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
             const searchInput = document.getElementById('searchInput'), resultsDiv = document.getElementById('searchResults');
@@ -296,10 +380,30 @@
             const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
             const cardDiv = document.getElementById('activeCard');
             if (!active) cardDiv.innerHTML = '<p>No active request</p>';
-            else cardDiv.innerHTML = `<div class="bg-slate-100 p-2 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY}${active.price}<br/>Payment: ${active.paymentMethod}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}</div>`;
+            else {
+                let ratingHtml = '';
+                if (active.status === 'delivered' && !active.rated) {
+                    ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment (optional)" class="border rounded p-1 text-xs w-full mt-1"><button id="submitRating" class="bg-blue-500 text-white text-xs p-1 rounded mt-1">Submit Rating</button></div>`;
+                }
+                cardDiv.innerHTML = `<div class="bg-slate-100 p-2 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY}${active.price}<br/>Payment: ${active.paymentMethod}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}${ratingHtml}</div>`;
+                if (active.status === 'delivered' && !active.rated) {
+                    const stars = document.querySelectorAll('.star-rating');
+                    let selectedRating = 0;
+                    stars.forEach(star => {
+                        star.addEventListener('click', () => { selectedRating = parseInt(star.dataset.rating); stars.forEach(s => s.style.color = (parseInt(s.dataset.rating) <= selectedRating) ? 'gold' : 'gray'); });
+                    });
+                    document.getElementById('submitRating').onclick = async () => {
+                        if (!selectedRating) return alert("Select a rating");
+                        const comment = document.getElementById('ratingComment').value;
+                        await rateDriver(active.id, active.driverId, selectedRating, comment);
+                        await updateDoc(doc(db, "requests", active.id), { rated: true });
+                        refreshCustomerUI();
+                    };
+                }
+            }
             const past = my.filter(r => r.status === 'delivered');
-            document.getElementById('historyList').innerHTML = past.length ? past.map(r => `<div>#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price}</div>`).join('') : '<div>No past trips</div>';
-            // driver location tracking (optional)
+            document.getElementById('historyList').innerHTML = past.length ? past.map(r => `<div>#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No past trips</div>';
+            // Driver live tracking
             const activeTrip = my.find(r => r.driverId && (r.status === 'accepted' || r.status === 'pickedUp'));
             if (activeTrip && activeTrip.driverId) {
                 if (window.driverPosUnsub) window.driverPosUnsub();
@@ -313,16 +417,18 @@
             }
         }
 
-        // ---------- DRIVER DASHBOARD (short and robust) ----------
+        // ---------- DRIVER DASHBOARD ----------
         function renderDriverDashboard() {
             document.getElementById('appContainer').innerHTML = `
                 <div class="bg-white rounded-2xl shadow p-5">
                     <div class="flex justify-between"><h2 class="text-xl">🚚 Driver: ${currentUser.email}</h2><span id="driverStatusBadge" class="bg-green-100 px-2 rounded-full">online</span><button id="logoutDriver" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
+                    <div class="mt-2"><span>⭐ Average Rating: <span id="avgRating">${driverData.averageRating?.toFixed(1) || 'N/A'}</span> (${driverData.ratingsCount||0} reviews)</span></div>
                     <div class="grid md:grid-cols-2 gap-4 mt-4">
                         <div><div id="driverMap" class="map-container h-48"></div><button id="gpsBtn" class="text-sm bg-slate-100 px-2 py-1 rounded">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-slate-100 px-2 py-1 rounded">🎯 Center</button></div>
                         <div><h3 class="font-bold">Available requests</h3><div id="availableList" class="max-h-64 overflow-auto"></div></div>
                     </div>
                     <div class="mt-4"><h3 class="font-bold">Active trip</h3><div id="activeTripDiv"></div><div id="dropoffInfo" class="hidden mt-2 p-2 bg-emerald-50 rounded"><b>Dropoff:</b> <span id="dropoffCoordDriver"></span> <span id="distToDropoff"></span></div><div class="flex gap-2 mt-3"><button id="moveToPickup" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>📍 Move to pickup</button><button id="moveToDropoff" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>🏁 Move to dropoff</button><button id="markPicked" class="bg-amber-100 px-3 py-2 rounded disabled:opacity-40" disabled>📦 Picked up</button><button id="markDelivered" class="bg-emerald-100 px-3 py-2 rounded disabled:opacity-40" disabled>✅ Completed</button></div></div>
+                    <div class="mt-4"><details><summary>📜 My Trip History</summary><div id="driverHistoryList" class="max-h-48 overflow-auto"></div></details></div>
                 </div>`;
             initDriverMap();
             attachDriverEvents();
@@ -365,7 +471,10 @@
             document.getElementById('markPicked').onclick = async () => {
                 if (driverData.activeRequestId) {
                     const trip = allRequests.find(r => r.id === driverData.activeRequestId);
-                    if (trip && trip.status === 'accepted') await updateDoc(doc(db, "requests", driverData.activeRequestId), { status: 'pickedUp' });
+                    if (trip && trip.status === 'accepted') {
+                        await updateDoc(doc(db, "requests", driverData.activeRequestId), { status: 'pickedUp' });
+                        showNotification("Trip Update", `You picked up ${trip.customerName}.`);
+                    }
                 }
             };
             document.getElementById('markDelivered').onclick = async () => {
@@ -377,6 +486,7 @@
                         driverData.activeRequestId = null;
                         driverData.status = "online";
                         refreshDriverUI();
+                        showNotification("Trip Completed", `You delivered to ${trip.customerName}. Thank you!`);
                     }
                 }
             };
@@ -397,6 +507,7 @@
                     driverData.activeRequestId = reqId;
                     driverData.status = "busy";
                     refreshDriverUI();
+                    showNotification("Request Accepted", `You accepted ${req.type} request from ${req.customerName}.`);
                 } else alert("Cannot accept");
             }));
             const activeId = driverData.activeRequestId;
@@ -421,12 +532,20 @@
             } else disableAll();
             function disableAll() { movePick.disabled = true; moveDrop.disabled = true; pickBtn.disabled = true; delBtn.disabled = true; }
             document.getElementById('driverStatusBadge').innerText = driverData.status;
+            document.getElementById('avgRating').innerText = driverData.averageRating?.toFixed(1) || 'N/A';
+            // Driver history
+            const myCompleted = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+            const historyDiv = document.getElementById('driverHistoryList');
+            historyDiv.innerHTML = myCompleted.length ? myCompleted.map(r => `<div class="border-b p-1 text-sm">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} | ${r.customerName} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No completed trips yet</div>';
         }
 
         // ---------- MAIN ENTRY ----------
         function startApp() {
             listenRequests();
-            if (currentRole === 'customer') renderCustomerDashboard();
+            if (currentUser.email === 'admin@logimove.com') {
+                currentRole = 'admin';
+                renderAdminPanel();
+            } else if (currentRole === 'customer') renderCustomerDashboard();
             else renderDriverDashboard();
         }
 
@@ -434,6 +553,7 @@
             if (user) {
                 currentUser = user;
                 await loadUserData(user.uid);
+                await initNotifications();
                 startApp();
             } else {
                 renderLogin();
