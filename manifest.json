@@ -1,0 +1,21 @@
+{
+  "name": "LogiMove Zambia",
+  "short_name": "LogiMove",
+  "description": "On-demand delivery & taxi service in Zambia",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#10b981",
+  "background_color": "#f1f5f9",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192?text=LM",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512?text=LM",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
