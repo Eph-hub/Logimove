@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#10b981">
     <title>LogiMove Zambia - Professional Logistics</title>
     <!-- Favicon (base64 emoji fallback) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
@@ -32,6 +34,16 @@
         /* Custom spinner */
         .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 20px auto; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.log('SW registration failed', err));
+    });
+  }
+</script>
     </style>
 </head>
 <body class="bg-slate-100 font-sans antialiased">
