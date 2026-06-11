@@ -3,27 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiMove Zambia - Complete Logistics Platform</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>LogiMove Zambia - Professional Logistics</title>
+    <!-- Favicon (base64 emoji fallback) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
+    <!-- Tailwind + Font Awesome + Chart.js + Leaflet + SweetAlert2 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        /* Dark mode variables */
+        :root { --bg: #f1f5f9; --card: white; --text: #0f172a; --border: #e2e8f0; }
+        body.dark { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --border: #334155; }
+        body { background-color: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+        .card-bg { background-color: var(--card); border-color: var(--border); }
         .map-container { height: 240px; width: 100%; border-radius: 16px; margin-bottom: 10px; }
-        .login-container { max-width: 450px; margin: auto; }
         .saved-place-item { background: #f1f5f9; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; display: inline-block; margin: 2px; }
         button:active { transform: scale(0.97); }
         .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
+        body.dark .location-card { background: #334155; }
         .star-rating { color: gray; cursor: pointer; font-size: 1.2rem; }
         .star-rating.active { color: gold; }
-        .notification-bell { position: fixed; bottom: 20px; right: 20px; background: #ef4444; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; }
+        /* Smooth transitions */
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom spinner */
+        .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 20px auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-slate-100">
+<body class="bg-slate-100 font-sans antialiased">
     <div id="appContainer" class="max-w-7xl mx-auto p-4">Loading...</div>
 
     <script type="module">
-        // ---------- FIREBASE IMPORTS ----------
+        // ---------- FIREBASE IMPORTS (keep as is) ----------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -37,18 +52,14 @@
             messagingSenderId: "136025058262",
             appId: "1:136025058262:web:821a7533b7b3e1b1b91277"
         };
-
+        const VAPID_KEY = "BA9DpLjj3iXB42GTsGrmu_Cv41BubNylrMcLYmnBBXTi4ib5pSUl46-tkskKk35URzS6-1NlYDA13fNGNTcBJVI";
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const messaging = getMessaging(app);
 
-        // ---------- VAPID KEY (provided) ----------
-        const VAPID_KEY = "BA9DpLjj3iXB42GTsGrmu_Cv41BubNylrMcLYmnBBXTi4ib5pSUl46-tkskKk35URzS6-1NlYDA13fNGNTcBJVI";
-
         // ---------- GLOBALS ----------
-        let currentUser = null;
-        let currentRole = null;
+        let currentUser = null, currentRole = null;
         let tempPickup = null, tempDropoff = null;
         let serviceType = "delivery";
         let customerMap, driverMap;
@@ -59,13 +70,19 @@
         let driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null };
         let mapSelectMode = "pickup";
         let fcmToken = null;
+        let chatUnsub = null;
 
-        // Pricing (ZMW)
+        // Pricing & currency
         const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
         const CURRENCY = "K";
         const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
+        let surgeMultiplier = 1.0; // can be dynamic later
 
-        // Helper functions
+        // Dark mode
+        if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+        function toggleDarkMode() { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); }
+
+        // Helpers
         function haversine(lat1, lng1, lat2, lng2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -73,11 +90,11 @@
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
         function autoPrice() {
-            if (!tempPickup || !tempDropoff) return;
+            if (!tempPickup || !tempDropoff) return 0;
             const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
-            const price = RATES[serviceType].base + dist * RATES[serviceType].perKm;
+            let price = RATES[serviceType].base + dist * RATES[serviceType].perKm;
+            price = price * surgeMultiplier;
             const rounded = Math.round(price * 2) / 2;
             const priceInput = document.getElementById('priceInput');
             if (priceInput) priceInput.value = rounded;
@@ -85,147 +102,46 @@
             if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
             const autoSpan = document.getElementById('autoPriceDisplay');
             if (autoSpan) autoSpan.innerText = `${CURRENCY}${rounded}`;
+            const breakdownSpan = document.getElementById('fareBreakdown');
+            if (breakdownSpan) breakdownSpan.innerHTML = `Base: ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${rounded}`;
             return rounded;
         }
 
-        // ---------- NOTIFICATIONS (with provided VAPID key) ----------
+        // Notifications
         async function initNotifications() {
             if (fcmToken) return;
             try {
                 const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    console.log("Notification permission denied");
-                    return;
-                }
-                // Request token with VAPID key
+                if (permission !== 'granted') return;
                 const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-                if (token) {
-                    fcmToken = token;
-                    if (currentUser) await setDoc(doc(db, "fcmTokens", currentUser.uid), { token, role: currentRole }, { merge: true });
-                    console.log("FCM token obtained");
-                } else {
-                    console.log("No registration token available.");
-                }
-            } catch(e) {
-                console.warn("FCM error, using fallback alerts", e);
-            }
+                if (token && currentUser) await setDoc(doc(db, "fcmTokens", currentUser.uid), { token, role: currentRole }, { merge: true });
+                fcmToken = token;
+            } catch(e) { console.warn("FCM error", e); }
         }
-
         function showNotification(title, body) {
-            if (Notification.permission === 'granted') {
-                new Notification(title, { body, icon: 'https://via.placeholder.com/64?text=LM' });
-            } else {
-                alert(`${title}: ${body}`);
-            }
+            if (Notification.permission === 'granted') new Notification(title, { body, icon: 'https://via.placeholder.com/64?text=LM' });
+            else Swal.fire({ title, text: body, icon: 'info', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
         }
+        onMessage(messaging, (payload) => showNotification(payload.notification.title, payload.notification.body));
 
-        // Listen for foreground messages
-        onMessage(messaging, (payload) => {
-            showNotification(payload.notification.title, payload.notification.body);
-        });
-
-        // ---------- RATINGS ----------
+        // Ratings
         async function rateDriver(requestId, driverId, rating, comment) {
-            await setDoc(doc(db, "ratings", requestId), {
-                driverId, rating, comment, timestamp: serverTimestamp(), requestId
-            });
+            await setDoc(doc(db, "ratings", requestId), { driverId, rating, comment, timestamp: serverTimestamp(), requestId });
             const ratingsSnap = await getDocs(query(collection(db, "ratings"), where("driverId", "==", driverId)));
             let total = 0, count = 0;
             ratingsSnap.forEach(d => { total += d.data().rating; count++; });
             const avg = total / count;
             await updateDoc(doc(db, "drivers", driverId), { averageRating: avg, ratingsCount: count });
-            alert("Thank you for rating!");
+            Swal.fire({ title: 'Thank you!', text: 'Rating submitted', icon: 'success', timer: 1500, showConfirmButton: false });
         }
 
-        // ---------- ADMIN PANEL ----------
-        async function renderAdminPanel() {
-            const usersSnap = await getDocs(collection(db, "users"));
-            const driversSnap = await getDocs(collection(db, "drivers"));
-            const requestsSnap = await getDocs(collection(db, "requests"));
-            const container = document.getElementById('appContainer');
-            container.innerHTML = `
-                <div class="bg-white rounded-2xl shadow p-5">
-                    <div class="flex justify-between"><h2 class="text-xl font-bold">👑 Admin Dashboard</h2><button id="adminLogout" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
-                    <div class="grid md:grid-cols-3 gap-4 mt-4">
-                        <div class="bg-blue-50 p-3 rounded">👥 Users: ${usersSnap.size}</div>
-                        <div class="bg-green-50 p-3 rounded">🚚 Drivers: ${driversSnap.size}</div>
-                        <div class="bg-amber-50 p-3 rounded">📦 Requests: ${requestsSnap.size}</div>
-                    </div>
-                    <div class="mt-4"><h3 class="font-bold">All Requests</h3><div id="adminRequestsList" class="max-h-64 overflow-auto"></div></div>
-                    <div class="mt-4"><h3 class="font-bold">All Drivers & Ratings</h3><div id="adminDriversList" class="max-h-64 overflow-auto"></div></div>
-                </div>`;
-            const reqList = document.getElementById('adminRequestsList');
-            reqList.innerHTML = allRequests.map(req => `<div class="border-b p-2">#${req.id.substring(0,6)} ${req.type} - ${req.status} - ${CURRENCY}${req.price}</div>`).join('');
-            const driversList = document.getElementById('adminDriversList');
-            const driversData = [];
-            for (const d of driversSnap.docs) {
-                const userDoc = await getDoc(doc(db, "users", d.id));
-                const email = userDoc.exists() ? userDoc.data().email : d.id;
-                driversData.push(`<div class="border-b p-2">${email} | Rating: ${d.data().averageRating?.toFixed(1) || 'N/A'} (${d.data().ratingsCount||0} reviews)</div>`);
+        // ---------- AUTH & LOAD ----------
+        async function saveUserToFirestore(user, role, name) {
+            await setDoc(doc(db, "users", user.uid), { email: user.email, name, role, createdAt: serverTimestamp() });
+            if (role === 'driver') {
+                await setDoc(doc(db, "drivers", user.uid), { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null, averageRating: 0, ratingsCount: 0 });
             }
-            driversList.innerHTML = driversData.join('');
-            document.getElementById('adminLogout').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
         }
-
-        // ---------- LOGIN & REGISTRATION ----------
-        function renderLogin() {
-            document.getElementById('appContainer').innerHTML = `
-                <div class="min-h-screen flex items-center justify-center p-4">
-                    <div class="bg-white rounded-2xl shadow-xl w-full login-container p-6">
-                        <div class="text-center"><div class="bg-green-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"><i class="fas fa-truck-fast text-white text-3xl"></i></div>
-                        <h1 class="text-2xl font-bold mt-3">Logi<span class="text-green-600">Move</span> Zambia</h1><p class="text-sm text-slate-500">Delivery & Taxi • ZMW</p></div>
-                        <div class="mt-4 space-y-3"><input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-2"><input type="password" id="loginPassword" placeholder="Password" class="w-full border rounded-xl p-2"><button id="loginBtn" class="w-full bg-green-600 text-white py-2 rounded-xl">Login</button></div>
-                        <div class="mt-4 border-t pt-4"><div class="flex gap-2"><button id="showCustomerReg" class="flex-1 bg-green-50 text-green-600 py-1 rounded-full">➕ New Customer</button><button id="showDriverReg" class="flex-1 bg-amber-50 text-amber-600 py-1 rounded-full">🚚 New Driver</button></div>
-                        <div id="customerRegForm" class="hidden mt-2 space-y-2"><input type="text" id="custName" placeholder="Full name" class="w-full border rounded-lg p-1"><input type="email" id="custEmail" placeholder="Email" class="w-full border rounded-lg p-1"><input type="password" id="custPwd" placeholder="Password" class="w-full border rounded-lg p-1"><button id="doCustomerReg" class="bg-green-500 text-white py-1 rounded-lg">Register & Login</button></div>
-                        <div id="driverRegForm" class="hidden mt-2 space-y-2"><input type="text" id="drvName" placeholder="Full name" class="w-full border rounded-lg p-1"><input type="email" id="drvEmail" placeholder="Email" class="w-full border rounded-lg p-1"><input type="password" id="drvPwd" placeholder="Password" class="w-full border rounded-lg p-1"><button id="doDriverReg" class="bg-amber-500 text-white py-1 rounded-lg">Register & Login</button></div></div>
-                    </div>
-                </div>`;
-            document.getElementById('loginBtn').onclick = async () => {
-                const email = document.getElementById('loginEmail').value.trim();
-                const pwd = document.getElementById('loginPassword').value;
-                try {
-                    const cred = await signInWithEmailAndPassword(auth, email, pwd);
-                    currentUser = cred.user;
-                    await loadUserData(currentUser.uid);
-                    await initNotifications();
-                    startApp();
-                } catch(e) { alert("Login error: " + e.message); }
-            };
-            const showCust = () => { document.getElementById('customerRegForm').classList.remove('hidden'); document.getElementById('driverRegForm').classList.add('hidden'); };
-            const showDrv = () => { document.getElementById('driverRegForm').classList.remove('hidden'); document.getElementById('customerRegForm').classList.add('hidden'); };
-            document.getElementById('showCustomerReg').onclick = showCust;
-            document.getElementById('showDriverReg').onclick = showDrv;
-            document.getElementById('doCustomerReg').onclick = async () => {
-                const name = document.getElementById('custName').value.trim();
-                const email = document.getElementById('custEmail').value.trim();
-                const pwd = document.getElementById('custPwd').value;
-                if (!name || !email || !pwd) return alert("Fill all");
-                try {
-                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-                    await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "customer", createdAt: serverTimestamp() });
-                    currentUser = cred.user;
-                    await loadUserData(currentUser.uid);
-                    await initNotifications();
-                    startApp();
-                } catch(e) { alert("Reg error: " + e.message); }
-            };
-            document.getElementById('doDriverReg').onclick = async () => {
-                const name = document.getElementById('drvName').value.trim();
-                const email = document.getElementById('drvEmail').value.trim();
-                const pwd = document.getElementById('drvPwd').value;
-                if (!name || !email || !pwd) return alert("Fill all");
-                try {
-                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-                    await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "driver", createdAt: serverTimestamp() });
-                    await setDoc(doc(db, "drivers", cred.user.uid), { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null, averageRating: 0, ratingsCount: 0 });
-                    currentUser = cred.user;
-                    await loadUserData(currentUser.uid);
-                    await initNotifications();
-                    startApp();
-                } catch(e) { alert("Reg error: " + e.message); }
-            };
-        }
-
         async function loadUserData(uid) {
             const userSnap = await getDoc(doc(db, "users", uid));
             if (userSnap.exists()) currentRole = userSnap.data().role;
@@ -235,10 +151,8 @@
                 else await setDoc(doc(db, "drivers", uid), driverData);
             }
             const savedSnap = await getDoc(doc(db, "savedPlaces", uid));
-            if (savedSnap.exists()) savedPlaces = savedSnap.data().places || [];
-            else savedPlaces = [];
+            savedPlaces = savedSnap.exists() ? savedSnap.data().places || [] : [];
         }
-
         function listenRequests() {
             if (unsubscribeRequests) unsubscribeRequests();
             const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
@@ -250,29 +164,140 @@
             });
         }
 
-        // ---------- CUSTOMER DASHBOARD ----------
+        // ------------------------------ LOGIN & REGISTRATION (separate choices) ------------------------------
+        function renderLogin() {
+            document.getElementById('appContainer').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6 transition-all fade-in">
+                        <div class="text-center">
+                            <div class="bg-green-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"><i class="fas fa-truck-fast text-white text-3xl"></i></div>
+                            <h1 class="text-2xl font-bold mt-3 dark:text-white">Logi<span class="text-green-600">Move</span> Zambia</h1>
+                            <p class="text-sm text-slate-500 dark:text-gray-300">Delivery & Taxi • ZMW</p>
+                        </div>
+                        <div class="mt-6 space-y-3">
+                            <input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-2 dark:bg-gray-700 dark:text-white">
+                            <input type="password" id="loginPassword" placeholder="Password" class="w-full border rounded-xl p-2 dark:bg-gray-700 dark:text-white">
+                            <button id="loginBtn" class="w-full bg-green-600 text-white py-2 rounded-xl hover:bg-green-700">Login</button>
+                        </div>
+                        <div class="mt-4 border-t pt-4 dark:border-gray-600">
+                            <div class="flex gap-3 text-sm">
+                                <button id="showCustomerReg" class="flex-1 bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300 py-1 rounded-full">➕ New Customer</button>
+                                <button id="showDriverReg" class="flex-1 bg-amber-50 dark:bg-amber-900 text-amber-600 dark:text-amber-300 py-1 rounded-full">🚚 New Driver</button>
+                            </div>
+                            <div id="customerRegForm" class="hidden mt-3 space-y-2">
+                                <input type="text" id="custName" placeholder="Full name" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <input type="email" id="custEmail" placeholder="Email" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <input type="password" id="custPwd" placeholder="Password" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <button id="doCustomerReg" class="w-full bg-green-500 text-white py-1 rounded-lg">Register as Customer</button>
+                            </div>
+                            <div id="driverRegForm" class="hidden mt-3 space-y-2">
+                                <input type="text" id="drvName" placeholder="Full name" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <input type="email" id="drvEmail" placeholder="Email" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <input type="password" id="drvPwd" placeholder="Password" class="w-full border rounded-lg p-2 dark:bg-gray-700">
+                                <button id="doDriverReg" class="w-full bg-amber-500 text-white py-1 rounded-lg">Register as Driver</button>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-center text-xs text-slate-400 dark:text-gray-400">
+                            <button id="darkModeToggle" class="underline">🌓 Dark Mode</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('loginBtn').onclick = async () => {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pwd = document.getElementById('loginPassword').value;
+                try {
+                    const cred = await signInWithEmailAndPassword(auth, email, pwd);
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    await initNotifications();
+                    startApp();
+                } catch(e) { Swal.fire('Login error', e.message, 'error'); }
+            };
+            const showCust = () => { document.getElementById('customerRegForm').classList.remove('hidden'); document.getElementById('driverRegForm').classList.add('hidden'); };
+            const showDrv = () => { document.getElementById('driverRegForm').classList.remove('hidden'); document.getElementById('customerRegForm').classList.add('hidden'); };
+            document.getElementById('showCustomerReg').onclick = showCust;
+            document.getElementById('showDriverReg').onclick = showDrv;
+            document.getElementById('doCustomerReg').onclick = async () => {
+                const name = document.getElementById('custName').value.trim();
+                const email = document.getElementById('custEmail').value.trim();
+                const pwd = document.getElementById('custPwd').value;
+                if (!name || !email || !pwd) return Swal.fire('All fields required');
+                try {
+                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+                    await saveUserToFirestore(cred.user, 'customer', name);
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    await initNotifications();
+                    startApp();
+                } catch(e) { Swal.fire('Registration error', e.message, 'error'); }
+            };
+            document.getElementById('doDriverReg').onclick = async () => {
+                const name = document.getElementById('drvName').value.trim();
+                const email = document.getElementById('drvEmail').value.trim();
+                const pwd = document.getElementById('drvPwd').value;
+                if (!name || !email || !pwd) return Swal.fire('All fields required');
+                try {
+                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+                    await saveUserToFirestore(cred.user, 'driver', name);
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    await initNotifications();
+                    startApp();
+                } catch(e) { Swal.fire('Registration error', e.message, 'error'); }
+            };
+            document.getElementById('darkModeToggle').onclick = () => toggleDarkMode();
+        }
+
+        // ------------------------------ ONBOARDING TOUR (simple) ------------------------------
+        let tourShown = false;
+        function startOnboarding(role) {
+            if (tourShown) return;
+            tourShown = true;
+            const steps = role === 'customer' ? [
+                { title: '📍 Set Pickup', text: 'Click "Set on map" then click anywhere on the map to set your pickup location.' },
+                { title: '🏁 Set Dropoff', text: 'Switch to dropoff mode and click the map for destination.' },
+                { title: '💰 Price & Publish', text: 'Distance and price auto‑calculate. You can edit the price, then publish your request.' }
+            ] : [
+                { title: '📋 Available Requests', text: 'See all open trips here. Accept one to start.' },
+                { title: '📍 Move to Pickup', text: 'Use "Move to pickup" button to simulate arrival.' },
+                { title: '📦 Complete Trip', text: 'Press "Picked up" then "Delivered" to finish and get paid.' }
+            ];
+            let i = 0;
+            function showStep() {
+                if (i >= steps.length) return;
+                Swal.fire({ title: steps[i].title, text: steps[i].text, icon: 'info', confirmButtonText: 'Next', allowOutsideClick: false }).then(() => { i++; showStep(); });
+            }
+            showStep();
+        }
+
+        // ------------------------------ CUSTOMER DASHBOARD (enhanced) ------------------------------
         function renderCustomerDashboard() {
             const container = document.getElementById('appContainer');
             container.innerHTML = `
-                <div class="bg-white rounded-2xl shadow p-5">
-                    <div class="flex justify-between"><h2 class="text-xl">👤 ${currentUser.email}</h2><button id="logoutBtn" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
-                    <div class="flex gap-2 my-3"><button id="serviceDelivery" class="px-3 py-1 rounded-full ${serviceType==='delivery'?'bg-green-600 text-white':'bg-gray-200'}">📦 Delivery</button><button id="serviceTaxi" class="px-3 py-1 rounded-full ${serviceType==='taxi'?'bg-green-600 text-white':'bg-gray-200'}">🚖 Taxi</button></div>
-                    <div class="relative"><input type="text" id="searchInput" placeholder="Search Zambia address..." class="w-full border rounded-xl p-2"><div id="searchResults" class="absolute bg-white border rounded-xl hidden z-10 w-full"></div></div>
-                    <div class="flex gap-1 my-2"><button id="setPickupSearch" class="text-xs bg-indigo-100 px-2 py-1 rounded">📍 Set as pickup</button><button id="setDropoffSearch" class="text-xs bg-emerald-100 px-2 py-1 rounded">🏁 Set as dropoff</button><button id="saveLocationBtn" class="text-xs bg-amber-100 px-2 py-1 rounded">💾 Save location</button></div>
-                    <div id="savedPlacesList" class="flex flex-wrap gap-1 my-2"></div>
-                    <div class="location-card"><div class="flex justify-between"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 px-2 rounded">Set on map</button></div><div id="pickupCoord">Not set</div><button id="clearPickup" class="text-xs text-red-500">Clear</button></div>
-                    <div class="location-card"><div class="flex justify-between"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 px-2 rounded">Set on map</button></div><div id="dropoffCoord">Not set</div><button id="clearDropoff" class="text-xs text-red-500">Clear</button></div>
-                    <div id="customerMap" class="map-container"></div>
-                    <div class="bg-green-50 p-2 rounded text-sm"><div>📏 Distance: <span id="distanceDisplay">— km</span></div><div>💰 Auto price: <span id="autoPriceDisplay">—</span></div></div>
-                    <div class="grid grid-cols-2 gap-2 mt-2"><select id="cargoSelect" class="border rounded p-1">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select><input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="border rounded p-1"><select id="paymentSelect" class="border rounded p-1 col-span-2">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select></div>
-                    <button id="publishBtn" class="w-full mt-3 bg-green-600 text-white py-2 rounded-xl">Publish Request</button>
-                </div>
-                <div class="bg-white rounded-2xl shadow p-5 mt-4"><h3 class="font-bold">Your active request</h3><div id="activeCard">None</div><details><summary>Past requests</summary><div id="historyList"></div></details></div>`;
+                <div class="fade-in">
+                    <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold dark:text-white">👤 ${currentUser.email}</h2><div><button id="darkModeToggle2" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">🌓</button><button id="logoutBtn" class="ml-2 bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
+                        <div class="flex gap-2"><button id="serviceDelivery" class="px-3 py-1 rounded-full ${serviceType==='delivery'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button><button id="serviceTaxi" class="px-3 py-1 rounded-full ${serviceType==='taxi'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button></div>
+                        <div class="relative mt-3"><input type="text" id="searchInput" placeholder="Search Zambia address..." class="w-full border rounded-xl p-2 dark:bg-gray-700"><div id="searchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-10 w-full"></div></div>
+                        <div class="flex gap-1 my-2"><button id="setPickupSearch" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">📍 Set as pickup</button><button id="setDropoffSearch" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-2 py-1 rounded">🏁 Set as dropoff</button><button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded">💾 Save location</button></div>
+                        <div id="savedPlacesList" class="flex flex-wrap gap-1 my-2"></div>
+                        <div class="location-card"><div class="flex justify-between"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 px-2 rounded">Set on map</button></div><div id="pickupCoord">Not set</div><button id="clearPickup" class="text-xs text-red-500">Clear</button></div>
+                        <div class="location-card"><div class="flex justify-between"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 px-2 rounded">Set on map</button></div><div id="dropoffCoord">Not set</div><button id="clearDropoff" class="text-xs text-red-500">Clear</button></div>
+                        <div id="customerMap" class="map-container"></div>
+                        <div class="bg-green-50 dark:bg-green-900 p-2 rounded text-sm"><div>📏 Distance: <span id="distanceDisplay">— km</span></div><div>💰 Auto price: <span id="autoPriceDisplay">—</span></div><div id="fareBreakdown" class="text-xs"></div></div>
+                        <div class="grid grid-cols-2 gap-2 mt-2"><select id="cargoSelect" class="border rounded p-1 dark:bg-gray-700">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select><input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="border rounded p-1 dark:bg-gray-700"><select id="paymentSelect" class="border rounded p-1 col-span-2 dark:bg-gray-700">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+                        <button id="publishBtn" class="w-full mt-3 bg-green-600 text-white py-2 rounded-xl hover:bg-green-700">Publish Request</button>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mt-4"><h3 class="font-bold">Your active request</h3><div id="activeCard">None</div><details><summary>📜 Past requests</summary><div id="historyList" class="max-h-48 overflow-auto"></div></details></div>
+                </div>`;
             initCustomerMap();
             attachCustomerEvents();
             refreshCustomerUI();
             renderSavedPlaces();
             if (tempPickup && tempDropoff) autoPrice();
+            // Onboarding
+            startOnboarding('customer');
+            document.getElementById('darkModeToggle2').onclick = () => toggleDarkMode();
         }
 
         function initCustomerMap() {
@@ -331,12 +356,12 @@
         async function attachCustomerEvents() {
             document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerDashboard(); };
             document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerDashboard(); };
-            document.getElementById('pickupMapMode').onclick = () => { mapSelectMode = 'pickup'; alert("Map click → PICKUP"); };
-            document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; alert("Map click → DROPOFF"); };
+            document.getElementById('pickupMapMode').onclick = () => { mapSelectMode = 'pickup'; Swal.fire({ title: 'Pickup mode', text: 'Click on map to set pickup', icon: 'info', timer: 1500, showConfirmButton: false }); };
+            document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; Swal.fire({ title: 'Dropoff mode', text: 'Click on map to set dropoff', icon: 'info', timer: 1500, showConfirmButton: false }); };
             document.getElementById('clearPickup').onclick = () => { tempPickup = null; updatePickupDropoffDisplay(); autoPrice(); };
             document.getElementById('clearDropoff').onclick = () => { tempDropoff = null; updatePickupDropoffDisplay(); autoPrice(); };
             document.getElementById('publishBtn').onclick = async () => {
-                if (!tempPickup || !tempDropoff) { alert("Set pickup and dropoff"); return; }
+                if (!tempPickup || !tempDropoff) { Swal.fire('Error', 'Set pickup and dropoff', 'warning'); return; }
                 let price = parseFloat(document.getElementById('priceInput').value);
                 if (isNaN(price)) price = autoPrice() || 0;
                 const req = {
@@ -348,7 +373,7 @@
                     createdAt: serverTimestamp()
                 };
                 await addDoc(collection(db, "requests"), req);
-                alert("Request published!");
+                Swal.fire({ title: 'Published!', text: 'Drivers will see your request', icon: 'success', timer: 2000, showConfirmButton: false });
                 showNotification("Request Published", "Drivers can now see your request.");
             };
             document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
@@ -361,7 +386,7 @@
                 timeout = setTimeout(async () => {
                     const res = await searchAddress(q);
                     if (!res.length) { resultsDiv.classList.add('hidden'); return; }
-                    resultsDiv.innerHTML = res.map(r => `<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,70)}</div>`).join('');
+                    resultsDiv.innerHTML = res.map(r => `<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,70)}</div>`).join('');
                     resultsDiv.classList.remove('hidden');
                     document.querySelectorAll('.autocomplete-item').forEach(el => {
                         el.addEventListener('click', () => {
@@ -372,15 +397,16 @@
                     });
                 }, 400);
             });
-            document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else alert("Search first"); };
-            document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else alert("Search first"); };
+            document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
+            document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
             document.getElementById('saveLocationBtn').onclick = async () => {
-                if (!lastSearchLoc) { alert("Search first"); return; }
-                const name = prompt("Save as:", "My Place");
+                if (!lastSearchLoc) { Swal.fire('Search first'); return; }
+                const { value: name } = await Swal.fire({ title: 'Save place', input: 'text', inputLabel: 'Name (e.g., Home, Work)', inputValue: 'My Place', showCancelButton: true });
                 if (!name) return;
                 savedPlaces.push({ name, lat: lastSearchLoc.lat, lng: lastSearchLoc.lng, address: lastSearchLoc.name });
                 await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
                 renderSavedPlaces();
+                Swal.fire('Saved!', '', 'success');
             };
             document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
         }
@@ -393,9 +419,9 @@
             else {
                 let ratingHtml = '';
                 if (active.status === 'delivered' && !active.rated) {
-                    ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment (optional)" class="border rounded p-1 text-xs w-full mt-1"><button id="submitRating" class="bg-blue-500 text-white text-xs p-1 rounded mt-1">Submit Rating</button></div>`;
+                    ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment (optional)" class="border rounded p-1 text-xs w-full mt-1 dark:bg-gray-700"><button id="submitRating" class="bg-blue-500 text-white text-xs p-1 rounded mt-1">Submit Rating</button></div>`;
                 }
-                cardDiv.innerHTML = `<div class="bg-slate-100 p-2 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY}${active.price}<br/>Payment: ${active.paymentMethod}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}${ratingHtml}</div>`;
+                cardDiv.innerHTML = `<div class="bg-slate-100 dark:bg-gray-700 p-2 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY}${active.price}<br/>Payment: ${active.paymentMethod}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}${ratingHtml}</div>`;
                 if (active.status === 'delivered' && !active.rated) {
                     const stars = document.querySelectorAll('.star-rating');
                     let selectedRating = 0;
@@ -403,7 +429,7 @@
                         star.addEventListener('click', () => { selectedRating = parseInt(star.dataset.rating); stars.forEach(s => s.style.color = (parseInt(s.dataset.rating) <= selectedRating) ? 'gold' : 'gray'); });
                     });
                     document.getElementById('submitRating').onclick = async () => {
-                        if (!selectedRating) return alert("Select a rating");
+                        if (!selectedRating) return Swal.fire('Select a rating');
                         const comment = document.getElementById('ratingComment').value;
                         await rateDriver(active.id, active.driverId, selectedRating, comment);
                         await updateDoc(doc(db, "requests", active.id), { rated: true });
@@ -412,8 +438,25 @@
                 }
             }
             const past = my.filter(r => r.status === 'delivered');
-            document.getElementById('historyList').innerHTML = past.length ? past.map(r => `<div>#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No past trips</div>';
-            // Driver live tracking
+            document.getElementById('historyList').innerHTML = past.length ? past.map(r => `<div class="border-b p-1">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} ${r.rated ? '⭐ Rated' : ''} <button class="text-blue-500 text-xs view-trip" data-id="${r.id}">View map</button></div>`).join('') : '<div>No past trips</div>';
+            document.querySelectorAll('.view-trip').forEach(btn => btn.addEventListener('click', (e) => {
+                const tripId = btn.dataset.id;
+                const trip = allRequests.find(r => r.id === tripId);
+                if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
+                    Swal.fire({
+                        title: 'Trip route',
+                        html: `<div id="miniMap" style="height:200px;"></div>`,
+                        didOpen: () => {
+                            const map = L.map('miniMap').setView([trip.pickupLatLng.lat, trip.pickupLatLng.lng], 12);
+                            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+                            L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
+                            L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
+                            L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {color: 'blue'}).addTo(map);
+                        }
+                    });
+                }
+            }));
+            // Driver tracking
             const activeTrip = my.find(r => r.driverId && (r.status === 'accepted' || r.status === 'pickedUp'));
             if (activeTrip && activeTrip.driverId) {
                 if (window.driverPosUnsub) window.driverPosUnsub();
@@ -422,27 +465,45 @@
                         const loc = docSnap.data();
                         if (window.driverMarkerCust) window.driverMarkerCust.setLatLng([loc.currentLat, loc.currentLng]);
                         else window.driverMarkerCust = L.marker([loc.currentLat, loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700"></i>', iconSize: [24,24] }) }).addTo(window.customerMap).bindTooltip('Driver');
+                        // ETA estimation
+                        if (activeTrip.dropoffLatLng) {
+                            const distToDropoff = haversine(loc.currentLat, loc.currentLng, activeTrip.dropoffLatLng.lat, activeTrip.dropoffLatLng.lng);
+                            const etaMinutes = Math.round(distToDropoff / 30 * 60); // assume 30 km/h avg
+                            window.driverMarkerCust.bindTooltip(`Driver · ETA ~${etaMinutes} min`).openTooltip();
+                        }
                     }
                 });
             }
         }
 
-        // ---------- DRIVER DASHBOARD ----------
+        // ------------------------------ DRIVER DASHBOARD (with earnings summary) ------------------------------
         function renderDriverDashboard() {
+            const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+            const totalEarned = completed.reduce((sum, r) => sum + r.price, 0);
+            const today = new Date().toDateString();
+            const todayEarned = completed.filter(r => r.createdAt?.toDate?.().toDateString() === today).reduce((sum, r) => sum + r.price, 0);
+            const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+            const weekEarned = completed.filter(r => r.createdAt?.toDate?.() > weekAgo).reduce((sum, r) => sum + r.price, 0);
             document.getElementById('appContainer').innerHTML = `
-                <div class="bg-white rounded-2xl shadow p-5">
-                    <div class="flex justify-between"><h2 class="text-xl">🚚 Driver: ${currentUser.email}</h2><span id="driverStatusBadge" class="bg-green-100 px-2 rounded-full">online</span><button id="logoutDriver" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
-                    <div class="mt-2"><span>⭐ Average Rating: <span id="avgRating">${driverData.averageRating?.toFixed(1) || 'N/A'}</span> (${driverData.ratingsCount||0} reviews)</span></div>
-                    <div class="grid md:grid-cols-2 gap-4 mt-4">
-                        <div><div id="driverMap" class="map-container h-48"></div><button id="gpsBtn" class="text-sm bg-slate-100 px-2 py-1 rounded">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-slate-100 px-2 py-1 rounded">🎯 Center</button></div>
-                        <div><h3 class="font-bold">Available requests</h3><div id="availableList" class="max-h-64 overflow-auto"></div></div>
+                <div class="fade-in">
+                    <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold dark:text-white">🚚 Driver: ${currentUser.email}</h2><div><button id="darkModeToggleD" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">🌓</button><button id="logoutDriver" class="ml-2 bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div></div>
+                    <div class="grid grid-cols-3 gap-2 mb-4"><div class="bg-green-100 dark:bg-green-900 p-3 rounded text-center"><div class="text-sm">Today</div><div class="font-bold">${CURRENCY}${todayEarned}</div></div><div class="bg-blue-100 dark:bg-blue-900 p-3 rounded text-center"><div class="text-sm">This Week</div><div class="font-bold">${CURRENCY}${weekEarned}</div></div><div class="bg-amber-100 dark:bg-amber-900 p-3 rounded text-center"><div class="text-sm">Total</div><div class="font-bold">${CURRENCY}${totalEarned}</div></div></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
+                        <div class="flex justify-between"><span>⭐ Average Rating: <span id="avgRating">${driverData.averageRating?.toFixed(1) || 'N/A'}</span> (${driverData.ratingsCount||0} reviews)</span><span id="driverStatusBadge" class="bg-green-100 dark:bg-green-900 px-2 rounded-full">${driverData.status}</span></div>
+                        <div class="grid md:grid-cols-2 gap-4 mt-4">
+                            <div><div id="driverMap" class="map-container h-48"></div><button id="gpsBtn" class="text-sm bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded">🎯 Center</button></div>
+                            <div><h3 class="font-bold">📋 Available requests</h3><div id="availableList" class="max-h-64 overflow-auto"></div></div>
+                        </div>
+                        <div class="mt-4"><h3 class="font-bold">Active trip</h3><div id="activeTripDiv"></div><div id="dropoffInfo" class="hidden mt-2 p-2 bg-emerald-50 dark:bg-emerald-900 rounded"><b>Dropoff:</b> <span id="dropoffCoordDriver"></span> <span id="distToDropoff"></span></div><div class="flex gap-2 mt-3"><button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-3 py-2 rounded disabled:opacity-40" disabled>📍 Move to pickup</button><button id="moveToDropoff" class="bg-blue-100 dark:bg-blue-900 px-3 py-2 rounded disabled:opacity-40" disabled>🏁 Move to dropoff</button><button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-3 py-2 rounded disabled:opacity-40" disabled>📦 Picked up</button><button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-3 py-2 rounded disabled:opacity-40" disabled>✅ Completed</button></div></div>
+                        <div class="mt-4"><details><summary>📜 My Trip History</summary><div id="driverHistoryList" class="max-h-48 overflow-auto"></div></details></div>
+                        <div class="mt-4"><details><summary>💬 Chat with customer (active trip)</summary><div id="chatPanel" class="hidden"><div id="chatMessages" class="h-40 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input type="text" id="chatInput" class="flex-1 border rounded p-1" placeholder="Type message..."><button id="sendChat" class="bg-blue-500 text-white px-2 rounded ml-1">Send</button></div></div><div id="noActiveChat" class="text-sm text-gray-500">No active trip to chat</div></details></div>
                     </div>
-                    <div class="mt-4"><h3 class="font-bold">Active trip</h3><div id="activeTripDiv"></div><div id="dropoffInfo" class="hidden mt-2 p-2 bg-emerald-50 rounded"><b>Dropoff:</b> <span id="dropoffCoordDriver"></span> <span id="distToDropoff"></span></div><div class="flex gap-2 mt-3"><button id="moveToPickup" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>📍 Move to pickup</button><button id="moveToDropoff" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>🏁 Move to dropoff</button><button id="markPicked" class="bg-amber-100 px-3 py-2 rounded disabled:opacity-40" disabled>📦 Picked up</button><button id="markDelivered" class="bg-emerald-100 px-3 py-2 rounded disabled:opacity-40" disabled>✅ Completed</button></div></div>
-                    <div class="mt-4"><details><summary>📜 My Trip History</summary><div id="driverHistoryList" class="max-h-48 overflow-auto"></div></details></div>
                 </div>`;
             initDriverMap();
             attachDriverEvents();
             refreshDriverUI();
+            startOnboarding('driver');
+            document.getElementById('darkModeToggleD').onclick = () => toggleDarkMode();
         }
 
         function initDriverMap() {
@@ -518,21 +579,29 @@
                     driverData.status = "busy";
                     refreshDriverUI();
                     showNotification("Request Accepted", `You accepted ${req.type} request from ${req.customerName}.`);
-                } else alert("Cannot accept");
+                } else Swal.fire('Cannot accept', 'Already busy or request taken', 'warning');
             }));
             const activeId = driverData.activeRequestId;
             const tripDiv = document.getElementById('activeTripDiv');
             if (!activeId) tripDiv.innerHTML = '<p>No active trip</p>';
             else {
                 const trip = allRequests.find(r => r.id === activeId);
-                tripDiv.innerHTML = trip ? `<div class="bg-amber-50 p-2 rounded">Trip #${trip.id.substring(0,6)} (${trip.type}) - ${trip.cargoDetail}<br/>Price: ${CURRENCY}${trip.price}<br/>Payment: ${trip.paymentMethod}<br/>Status: ${trip.status}</div>` : '<p>Loading...</p>';
+                tripDiv.innerHTML = trip ? `<div class="bg-amber-50 dark:bg-amber-900 p-2 rounded">Trip #${trip.id.substring(0,6)} (${trip.type}) - ${trip.cargoDetail}<br/>Price: ${CURRENCY}${trip.price}<br/>Payment: ${trip.paymentMethod}<br/>Status: ${trip.status}</div>` : '<p>Loading...</p>';
                 const dropoffDiv = document.getElementById('dropoffInfo');
                 if (trip && trip.dropoffLatLng) {
                     dropoffDiv.classList.remove('hidden');
                     document.getElementById('dropoffCoordDriver').innerText = `${trip.dropoffLatLng.lat.toFixed(5)}, ${trip.dropoffLatLng.lng.toFixed(5)}`;
                     const dist = haversine(driverData.currentLat, driverData.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
-                    document.getElementById('distToDropoff').innerHTML = `Distance: ${dist.toFixed(2)} km`;
+                    document.getElementById('distToDropoff').innerHTML = `Distance: ${dist.toFixed(2)} km (ETA ~${Math.round(dist/30*60)} min)`;
                 } else dropoffDiv.classList.add('hidden');
+                // Chat UI
+                const chatPanel = document.getElementById('chatPanel');
+                const noChat = document.getElementById('noActiveChat');
+                if (chatPanel && noChat) {
+                    chatPanel.classList.remove('hidden');
+                    noChat.classList.add('hidden');
+                    loadChat(activeId);
+                }
             }
             const movePick = document.getElementById('moveToPickup'), moveDrop = document.getElementById('moveToDropoff'), pickBtn = document.getElementById('markPicked'), delBtn = document.getElementById('markDelivered');
             if (activeId) {
@@ -543,13 +612,103 @@
             function disableAll() { movePick.disabled = true; moveDrop.disabled = true; pickBtn.disabled = true; delBtn.disabled = true; }
             document.getElementById('driverStatusBadge').innerText = driverData.status;
             document.getElementById('avgRating').innerText = driverData.averageRating?.toFixed(1) || 'N/A';
-            // Driver history
             const myCompleted = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
             const historyDiv = document.getElementById('driverHistoryList');
-            historyDiv.innerHTML = myCompleted.length? myCompleted.map(r => `<div class="border-b p-1 text-sm">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} | ${r.customerName} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No completed trips yet</div>';
+            historyDiv.innerHTML = myCompleted.length ? myCompleted.map(r => `<div class="border-b p-1 text-sm">#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price} | ${r.customerName} ${r.rated ? '⭐ Rated' : ''}</div>`).join('') : '<div>No completed trips yet</div>';
         }
 
-        // ---------- MAIN ENTRY ----------
+        // Chat system
+        async function loadChat(requestId) {
+            if (chatUnsub) chatUnsub();
+            const chatRef = collection(db, "chats", requestId, "messages");
+            const q = query(chatRef, orderBy("timestamp"));
+            chatUnsub = onSnapshot(q, (snap) => {
+                const messages = snap.docs.map(d => d.data());
+                const chatDiv = document.getElementById('chatMessages');
+                if (chatDiv) chatDiv.innerHTML = messages.map(m => `<div><b>${m.senderName}:</b> ${m.text}</div>`).join('');
+            });
+            const sendBtn = document.getElementById('sendChat');
+            const input = document.getElementById('chatInput');
+            if (sendBtn && input) {
+                sendBtn.onclick = async () => {
+                    const text = input.value.trim();
+                    if (!text) return;
+                    await addDoc(collection(db, "chats", requestId, "messages"), {
+                        senderId: currentUser.uid,
+                        senderName: currentUser.email,
+                        text,
+                        timestamp: serverTimestamp()
+                    });
+                    input.value = '';
+                };
+            }
+        }
+
+        // ------------------------------ ADMIN PANEL (with charts, export, user actions) ------------------------------
+        async function renderAdminPanel() {
+            const usersSnap = await getDocs(collection(db, "users"));
+            const driversSnap = await getDocs(collection(db, "drivers"));
+            const requestsSnap = await getDocs(collection(db, "requests"));
+            const requestsByDay = {};
+            allRequests.forEach(r => {
+                const day = r.createdAt?.toDate?.()?.toDateString() || 'Unknown';
+                requestsByDay[day] = (requestsByDay[day] || 0) + 1;
+            });
+            const chartLabels = Object.keys(requestsByDay);
+            const chartData = Object.values(requestsByDay);
+            // Top drivers by rating
+            const topDrivers = [];
+            for (const d of driversSnap.docs) {
+                const userDoc = await getDoc(doc(db, "users", d.id));
+                const email = userDoc.exists() ? userDoc.data().email : d.id;
+                topDrivers.push({ email, rating: d.data().averageRating || 0, count: d.data().ratingsCount || 0 });
+            }
+            topDrivers.sort((a,b) => b.rating - a.rating);
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="fade-in">
+                    <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold dark:text-white">👑 Admin Dashboard</h2><div><button id="darkModeToggleA" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">🌓</button><button id="adminLogout" class="ml-2 bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div></div>
+                    <div class="grid md:grid-cols-3 gap-4 mb-4"><div class="bg-blue-100 dark:bg-blue-900 p-3 rounded">👥 Users: ${usersSnap.size}</div><div class="bg-green-100 dark:bg-green-900 p-3 rounded">🚚 Drivers: ${driversSnap.size}</div><div class="bg-amber-100 dark:bg-amber-900 p-3 rounded">📦 Requests: ${requestsSnap.size}</div></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-4"><h3 class="font-bold">📈 Requests per day</h3><canvas id="requestsChart" width="400" height="200"></canvas></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-4"><h3 class="font-bold">🏆 Top Rated Drivers</h3><ul id="topDriversList"></ul></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-4"><h3 class="font-bold">📋 All Requests</h3><button id="exportCSV" class="bg-green-500 text-white px-3 py-1 rounded text-sm mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-64 overflow-auto"></div></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5"><h3 class="font-bold">👤 User Management (demo actions)</h3><div id="userManagementList" class="max-h-64 overflow-auto"></div><p class="text-xs mt-2 text-gray-500">⚠️ Suspend/ban actions are visual only; implement Firebase Auth disable in production.</p></div>
+                </div>`;
+            // Chart
+            new Chart(document.getElementById('requestsChart'), { type: 'line', data: { labels: chartLabels, datasets: [{ label: 'Requests', data: chartData, borderColor: '#10b981' }] } });
+            // Top drivers
+            const driversList = document.getElementById('topDriversList');
+            driversList.innerHTML = topDrivers.slice(0,5).map(d => `<li>${d.email} - ⭐ ${d.rating.toFixed(1)} (${d.count} reviews)</li>`).join('');
+            // All requests list
+            const reqList = document.getElementById('adminRequestsList');
+            reqList.innerHTML = allRequests.map(req => `<div class="border-b p-2">#${req.id.substring(0,6)} ${req.type} - ${req.status} - ${CURRENCY}${req.price} - ${req.customerName}</div>`).join('');
+            // Export CSV
+            document.getElementById('exportCSV').onclick = () => {
+                const headers = ['ID','Type','Status','Price (ZMW)','Customer','Driver','Payment','Created'];
+                const rows = allRequests.map(r => [r.id, r.type, r.status, r.price, r.customerName, r.driverName || '', r.paymentMethod, r.createdAt?.toDate?.()?.toISOString() || '']);
+                const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+                const blob = new Blob([csv], {type: 'text/csv'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'logimove_requests.csv';
+                a.click();
+                Swal.fire('Exported!', 'CSV file downloaded', 'success');
+            };
+            // User management list
+            const userMgmt = document.getElementById('userManagementList');
+            const allUsers = await getDocs(collection(db, "users"));
+            userMgmt.innerHTML = '';
+            for (const u of allUsers.docs) {
+                const data = u.data();
+                userMgmt.innerHTML += `<div class="border-b p-2 flex justify-between"><span>${data.email} (${data.role})</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset password</button></div></div>`;
+            }
+            document.querySelectorAll('.suspendBtn').forEach(btn => btn.addEventListener('click', () => Swal.fire('Demo', `Suspension of ${btn.dataset.uid} would be implemented with Firebase Admin SDK`, 'info')));
+            document.querySelectorAll('.resetBtn').forEach(btn => btn.addEventListener('click', () => Swal.fire('Demo', `Password reset email to ${btn.dataset.email} would be sent`, 'info')));
+            document.getElementById('adminLogout').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
+            document.getElementById('darkModeToggleA').onclick = () => toggleDarkMode();
+        }
+
+        // ---------- MAIN ----------
         function startApp() {
             listenRequests();
             if (currentUser.email === 'admin@logimove.com') {
