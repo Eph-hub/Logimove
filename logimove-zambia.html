@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiMove Zambia - Local Logistics (ZMW)</title>
+    <!-- Leaflet CSS + JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Tailwind + Font Awesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        // Make auth and db available globally
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.signOut = signOut;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.collection = collection;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy;
+        window.addDoc = addDoc;
+        window.serverTimestamp = serverTimestamp;
+    </script>
+    <style>
+        /* --- Tailwind CSS utilities for custom components --- */
+        .map-container { height: 240px; width: 100%; border-radius: 16px; z-index: 1; }
+        .badge-status { padding: 4px 10px; border-radius: 40px; font-size: 0.7rem; font-weight: bold; }
+        .login-container { max-width: 450px; }
+        .saved-place-item { background: #f8fafc; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; cursor: pointer; transition: 0.1s; }
+        .saved-place-item:hover { background: #e2e8f0; }
+        button:active { transform: scale(0.97); transition: 0.05s; }
+        .autocomplete-results { position: absolute; z-index: 1000; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; width: 100%; }
+        .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #e2e8f0; font-size: 0.8rem; }
+        .autocomplete-item:hover { background: #f1f5f9; }
+        .register-section { border-top: 1px solid #e2e8f0; margin-top: 1rem; padding-top: 1rem; }
+        .register-form { display: none; margin-top: 0.75rem; gap: 0.5rem; flex-direction: column; }
+        .register-form.active { display: flex; }
+        .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 font-sans antialiased">
+    <div id="appContainer"></div>
+    <script>
+        // ---------- GLOBAL VARIABLES ----------
+        /* cSpell:ignore pickup dropoff Airtel MTN Zamtel */
+        let currentUser = null;
+        let currentUserRole = null;
+        let currentUserDocId = null;
+        let tempPickup = null;
+        let tempDropoff = null;
+        window.mapSelectMode = null;
+        let serviceType = "delivery";
+        let customerMap, driverMap;
+        let pickupMarker = null, dropoffMarker = null;
+        let driverMarker = null;
+        let driverRoutePickup = null, driverRouteDropoff = null;
+        let savedPlaces = [];
+        let allRequestsUnsubscribe = null;
+        let driverLocationUnsubscribe = null;
+        let selectedPaymentMethod = "cash";
+
+        // --- 1. ZAMBIAN PRICING RATES (in Kwacha) ---
+        // Based on local market research, rates are approx 20-30 ZMW base + 8-12 ZMW per km.
+        const RATES = {
+            taxi: { base: 25, perKm: 10 },      // e.g., 25 ZMW base + 10 ZMW/km
+            delivery: { base: 30, perKm: 12 }   // e.g., 30 ZMW base + 12 ZMW/km for parcels
+        };
+        // Currency symbol
+        const CURRENCY_SYMBOL = "K";
+        // Payment methods popular in Zambia
+        const PAYMENT_METHODS = [
+            { id: "cash", label: "Cash on Delivery" },
+            { id: "airtel", label: "Airtel Money", icon: "fas fa-mobile-alt" },
+            { id: "mtn", label: "MTN Money", icon: "fas fa-mobile-alt" },
+            { id: "zamtel", label: "Zamtel Pay", icon: "fas fa-mobile-alt" },
+            { id: "card", label: "Credit/Debit Card", icon: "fas fa-credit-card" }
+        ];
+
+        // --- Helper functions (Haversine formula, price calculation) ---
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        function calculatePrice(distanceKm, type) {
+            const rate = RATES[type];
+            if (!rate) return 5;
+            let price = rate.base + (distanceKm * rate.perKm);
+            // Round to nearest 50 ngwee (0.5 ZMW) for easier cash payments
+            return Math.round(price * 2) / 2;
+        }
+        function updateAutomaticPrice() {
+            if (!tempPickup || !tempDropoff) return;
+            const dist = calculateDistance(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
+            const computed = calculatePrice(dist, serviceType);
+            const priceInput = document.getElementById('priceInput');
+            if (priceInput && !priceInput.disabled) priceInput.value = computed;
+            const distSpan = document.getElementById('distanceDisplay');
+            if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
+            const autoSpan = document.getElementById('autoPriceDisplay');
+            if (autoSpan) autoSpan.innerText = `${CURRENCY_SYMBOL}${computed.toFixed(2)}`;
+            return dist;
+        }
+
+        // --- Firebase Helpers (unchanged, but crucial) ---
+        async function saveUserToFirestore(user, role, name) {
+            const userRef = doc(window.firebaseDb, "users", user.uid);
+            await setDoc(userRef, { email: user.email, name, role, createdAt: serverTimestamp() });
+            if (role === 'driver') {
+                await setDoc(doc(window.firebaseDb, "drivers", user.uid), {
+                    currentLat: -15.3875,  // Default to Lusaka, Zambia
+                    currentLng: 28.3228,
+                    status: "online",
+                    activeRequestId: null
+                });
+            }
+            return userRef.id;
+        }
+        async function loadUserData(uid) {
+            const userDoc = await getDoc(doc(window.firebaseDb, "users", uid));
+            if (userDoc.exists()) {
+                currentUserRole = userDoc.data().role;
+                currentUserDocId = uid;
+                if (currentUserRole === 'driver') {
+                    const driverDoc = await getDoc(doc(window.firebaseDb, "drivers", uid));
+                    if (driverDoc.exists()) {
+                        window.driverData = driverDoc.data();
+                    } else {
+                        window.driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null };
+                        await setDoc(doc(window.firebaseDb, "drivers", uid), window.driverData);
+                    }
+                }
+                const savedPlacesRef = doc(window.firebaseDb, "savedPlaces", uid);
+                const savedPlacesDoc = await getDoc(savedPlacesRef);
+                if (savedPlacesDoc.exists()) savedPlaces = savedPlacesDoc.data().places || [];
+                else savedPlaces = [];
+            }
+        }
+        function listenRequests() {
+            if (allRequestsUnsubscribe) allRequestsUnsubscribe();
+            const q = query(collection(window.firebaseDb, "requests"), orderBy("createdAt", "desc"));
+            allRequestsUnsubscribe = onSnapshot(q, (snapshot) => {
+                window.allRequests = [];
+                snapshot.forEach(doc => window.allRequests.push({ id: doc.id, ...doc.data() }));
+                if (currentUserRole === 'customer') refreshCustomerUI();
+                else if (currentUserRole === 'driver') refreshDriverUI();
+            });
+        }
+        function listenDriverLocation(driverId) {
+            if (driverLocationUnsubscribe) driverLocationUnsubscribe();
+            driverLocationUnsubscribe = onSnapshot(doc(window.firebaseDb, "drivers", driverId), (docSnap) => {
+                if (docSnap.exists() && window.customerMap) {
+                    const loc = docSnap.data();
+                    if (window.custDriverMarker) window.custDriverMarker.setLatLng([loc.currentLat, loc.currentLng]);
+                    else if (window.customerMap) {
+                        window.custDriverMarker = L.marker([loc.currentLat, loc.currentLng], {
+                            icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700 text-xl"></i>', iconSize: [24,24] })
+                        }).addTo(window.customerMap).bindTooltip('Driver');
+                    }
+                }
+            });
+        }
+
+        // --- LOGIN UI (unchanged) ---
+        function renderLogin() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-xl w-full login-container p-6">
+                        <div class="text-center mb-5">
+                            <div class="bg-green-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                                <i class="fas fa-truck-fast text-white text-3xl"></i>
+                            </div>
+                            <h1 class="text-2xl font-extrabold mt-3 text-slate-800">Logi<span class="text-green-600">Move</span> Zambia</h1>
+                            <p class="text-slate-500 text-sm">Delivery & Taxi • Prices in Zambian Kwacha (ZMW)</p>
+                        </div>
+                        <div class="space-y-3">
+                            <input type="email" id="loginEmail" placeholder="Email" class="w-full border border-slate-300 rounded-xl px-4 py-2">
+                            <input type="password" id="loginPassword" placeholder="Password" class="w-full border border-slate-300 rounded-xl px-4 py-2">
+                            <button id="loginBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-xl">Login</button>
+                        </div>
+                        <div class="register-section">
+                            <div class="flex gap-3 text-sm">
+                                <button id="showCustomerReg" class="flex-1 bg-green-50 text-green-600 py-1 rounded-full">➕ New Customer</button>
+                                <button id="showDriverReg" class="flex-1 bg-amber-50 text-amber-600 py-1 rounded-full">🚚 New Driver</button>
+                            </div>
+                            <div id="customerRegForm" class="register-form">
+                                <input type="text" id="custRegName" placeholder="Full name" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="email" id="custRegEmail" placeholder="Email" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="password" id="custRegPassword" placeholder="Password" class="border rounded-lg px-3 py-1 text-sm">
+                                <button id="doCustomerReg" class="bg-green-500 text-white py-1 rounded-lg text-sm">Register & Login</button>
+                            </div>
+                            <div id="driverRegForm" class="register-form">
+                                <input type="text" id="driverRegName" placeholder="Full name" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="email" id="driverRegEmail" placeholder="Email" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="password" id="driverRegPassword" placeholder="Password" class="border rounded-lg px-3 py-1 text-sm">
+                                <button id="doDriverReg" class="bg-amber-500 text-white py-1 rounded-lg text-sm">Register & Login</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // ... (event listeners remain identical to previous version)
+            document.getElementById('loginBtn').onclick = () => {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pwd = document.getElementById('loginPassword').value;
+                signInWithEmailAndPassword(window.firebaseAuth, email, pwd)
+                    .then(async (userCred) => { currentUser = userCred.user; await loadUserData(currentUser.uid); listenRequests(); renderMainApp(); })
+                    .catch(err => alert("Login error: " + err.message));
+            };
+            document.getElementById('showCustomerReg').onclick = () => { document.getElementById('customerRegForm').classList.add('active'); document.getElementById('driverRegForm').classList.remove('active'); };
+            document.getElementById('showDriverReg').onclick = () => { document.getElementById('driverRegForm').classList.add('active'); document.getElementById('customerRegForm').classList.remove('active'); };
+            document.getElementById('doCustomerReg').onclick = async () => {
+                const name = document.getElementById('custRegName').value.trim();
+                const email = document.getElementById('custRegEmail').value.trim();
+                const pwd = document.getElementById('custRegPassword').value;
+                if (!name || !email || !pwd) { alert("All fields required"); return; }
+                try {
+                    const userCred = await createUserWithEmailAndPassword(window.firebaseAuth, email, pwd);
+                    await saveUserToFirestore(userCred.user, 'customer', name);
+                    currentUser = userCred.user;
+                    await loadUserData(currentUser.uid);
+                    listenRequests();
+                    renderMainApp();
+                } catch(err) { alert("Registration error: " + err.message); }
+            };
+            document.getElementById('doDriverReg').onclick = async () => {
+                const name = document.getElementById('driverRegName').value.trim();
+                const email = document.getElementById('driverRegEmail').value.trim();
+                const pwd = document.getElementById('driverRegPassword').value;
+                if (!name || !email || !pwd) { alert("All fields required"); return; }
+                try {
+                    const userCred = await createUserWithEmailAndPassword(window.firebaseAuth, email, pwd);
+                    await saveUserToFirestore(userCred.user, 'driver', name);
+                    currentUser = userCred.user;
+                    await loadUserData(currentUser.uid);
+                    listenRequests();
+                    renderMainApp();
+                } catch(err) { alert("Registration error: " + err.message); }
+            };
+        }
+        function renderMainApp() {
+            if (!currentUser) { renderLogin(); return; }
+            if (currentUserRole === 'customer') renderCustomerDashboard();
+            else renderDriverDashboard();
+        }
+
+        // --- CUSTOMER DASHBOARD (ZMW + Payment Methods) ---
+        function renderCustomerDashboard() {
+            const container = document.getElementById('appContainer');
+            // Build payment method dropdown options
+            const paymentOptions = PAYMENT_METHODS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+            container.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 py-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                        <div><h2 class="font-bold text-xl">👤 ${currentUser.email} (Customer)</h2></div>
+                        <button id="logoutBtn" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm">Logout</button>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-md p-5 mb-6">
+                        <div class="flex gap-4 border-b pb-3 mb-4">
+                            <button id="serviceDeliveryBtn" class="service-toggle px-4 py-2 rounded-full font-semibold ${serviceType === 'delivery' ? 'bg-green-600 text-white' : 'bg-slate-100'}"><i class="fas fa-box"></i> Delivery</button>
+                            <button id="serviceTaxiBtn" class="service-toggle px-4 py-2 rounded-full font-semibold ${serviceType === 'taxi' ? 'bg-green-600 text-white' : 'bg-slate-100'}"><i class="fas fa-taxi"></i> Taxi</button>
+                        </div>
+                        <div class="mb-4">
+                            <div class="relative">
+                                <input type="text" id="globalSearchInput" placeholder="Search any address in Zambia..." class="w-full border rounded-xl px-4 py-2 pr-10 text-sm">
+                                <i class="fas fa-search absolute right-3 top-3 text-slate-400"></i>
+                                <div id="searchResults" class="autocomplete-results hidden"></div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <button id="setAsPickupBtn" class="text-xs bg-indigo-100 px-2 py-1 rounded-full">📍 Set as pickup</button>
+                                <button id="setAsDropoffBtn" class="text-xs bg-emerald-100 px-2 py-1 rounded-full">🏁 Set as dropoff</button>
+                                <button id="saveCurrentLocationBtn" class="text-xs bg-amber-100 px-2 py-1 rounded-full"><i class="fas fa-save"></i> Save current location</button>
+                            </div>
+                        </div>
+                        <div class="mb-3"><span class="text-xs font-semibold">⭐ SAVED PLACES</span><div id="savedPlacesList" class="flex flex-wrap gap-2 mt-1"></div></div>
+                        <div class="location-card border border-indigo-200"><div class="flex justify-between"><span class="font-bold text-indigo-700">📍 PICKUP</span><button id="pickupModeBtn" class="text-xs bg-indigo-100 px-2 py-1 rounded-full">Set on map</button></div><div id="pickupCoordDisplay" class="text-sm font-mono bg-white p-2 rounded border">Not set</div><button id="clearPickupBtn" class="text-xs text-red-500 mt-1">Clear</button></div>
+                        <div class="location-card border border-emerald-200 mt-2"><div class="flex justify-between"><span class="font-bold text-emerald-700">🏁 DROPOFF</span><button id="dropoffModeBtn" class="text-xs bg-emerald-100 px-2 py-1 rounded-full">Set on map</button></div><div id="dropoffCoordDisplay" class="text-sm font-mono bg-white p-2 rounded border">Not set</div><button id="clearDropoffBtn" class="text-xs text-red-500 mt-1">Clear</button></div>
+                        <div class="mt-3"><div id="customerMap" class="map-container border"></div><p class="text-[11px] text-slate-400 mt-1">Click map after choosing mode</p></div>
+                        <div class="mt-2 p-2 bg-green-50 rounded-lg text-sm"><div class="flex justify-between"><span>📏 Distance:</span><span id="distanceDisplay">— km</span></div><div class="flex justify-between"><span>💰 Auto price (${CURRENCY_SYMBOL}):</span><span id="autoPriceDisplay">—</span></div></div>
+                        <div class="grid grid-cols-2 gap-3 mt-2">
+                            <div><label class="text-sm">${serviceType === 'delivery' ? 'Cargo type' : 'Passengers'}</label><select id="cargoOrPassengers" class="w-full border rounded-xl p-2">${serviceType === 'delivery' ? '<option>Package</option><option>Box</option><option>Furniture</option>' : '<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select></div>
+                            <div><label class="text-sm">Price (ZMW)</label><input type="number" id="priceInput" step="0.5" class="w-full border rounded-xl p-2"></div>
+                            <div class="col-span-2"><label class="text-sm">Payment Method</label><select id="paymentMethod" class="w-full border rounded-xl p-2">${paymentOptions}</select></div>
+                        </div>
+                        <button id="createRequestBtn" class="w-full mt-4 bg-green-600 text-white py-3 rounded-xl font-bold">Publish Request</button>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-md p-5"><h3 class="font-bold">Your active request</h3><div id="customerActiveCard" class="mt-2 text-sm">Loading...</div><details><summary class="cursor-pointer text-slate-500">Past requests</summary><div id="customerHistoryList" class="mt-2 max-h-40 overflow-auto text-xs"></div></details></div>
+                </div>
+            `;
+            initCustomerMap();
+            attachCustomerEvents();
+            refreshCustomerUI();
+            renderSavedPlaces();
+            if (tempPickup && tempDropoff) updateAutomaticPrice();
+        }
+        // ... (initCustomerMap, updatePickupDropoffDisplay, renderSavedPlaces, searchAddress, escapeHtml remain largely the same as the previous version, but with Zambian default map center)
+        function initCustomerMap() {
+            if (customerMap) customerMap.remove();
+            // Center on Lusaka, Zambia
+            customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
+            customerMap.on('click', (e) => {
+                if (window.mapSelectMode === 'pickup') { tempPickup = e.latlng; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                else if (window.mapSelectMode === 'dropoff') { tempDropoff = e.latlng; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+            });
+            if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
+            if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
+            window.customerMap = customerMap;
+        }
+        function updatePickupDropoffDisplay() {
+            const pickupDiv = document.getElementById('pickupCoordDisplay');
+            if (pickupDiv) pickupDiv.innerHTML = tempPickup ? `${tempPickup.lat.toFixed(5)}, ${tempPickup.lng.toFixed(5)}` : 'Not set';
+            const dropoffDiv = document.getElementById('dropoffCoordDisplay');
+            if (dropoffDiv) dropoffDiv.innerHTML = tempDropoff ? `${tempDropoff.lat.toFixed(5)}, ${tempDropoff.lng.toFixed(5)}` : 'Not set';
+            if (customerMap) {
+                if (pickupMarker) customerMap.removeLayer(pickupMarker);
+                if (dropoffMarker) customerMap.removeLayer(dropoffMarker);
+                if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap);
+                if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap);
+            }
+        }
+        async function renderSavedPlaces() {
+            const container = document.getElementById('savedPlacesList');
+            if (!container) return;
+            if (!savedPlaces.length) { container.innerHTML = '<span class="text-xs text-slate-400">No saved places.</span>'; return; }
+            container.innerHTML = savedPlaces.map(place => `
+                <div class="saved-place-item flex items-center gap-1" data-lat="${place.lat}" data-lng="${place.lng}" data-name="${place.name}">
+                    <i class="fas fa-map-pin text-indigo-400 text-xs"></i>
+                    <span>${escapeHtml(place.name)}</span>
+                    <i class="fas fa-trash-alt text-red-400 text-xs ml-1 delete-saved" data-name="${place.name}" style="cursor:pointer"></i>
+                </div>
+            `).join('');
+            document.querySelectorAll('.saved-place-item').forEach(el => {
+                const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), name = el.dataset.name;
+                el.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-saved')) return;
+                    if (window.mapSelectMode === 'pickup') { tempPickup = { lat, lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                    else { tempDropoff = { lat, lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                });
+                const delBtn = el.querySelector('.delete-saved');
+                if (delBtn) delBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    savedPlaces = savedPlaces.filter(p => p.name !== name);
+                    await setDoc(doc(window.firebaseDb, "savedPlaces", currentUser.uid), { places: savedPlaces });
+                    renderSavedPlaces();
+                });
+            });
+        }
+        async function searchAddress(query) {
+            if (!query.trim()) return [];
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&countrycodes=zm`;
+            try { const res = await fetch(url); const data = await res.json(); return data.map(item => ({ lat: parseFloat(item.lat), lng: parseFloat(item.lon), display_name: item.display_name })); } catch(e) { return []; }
+        }
+        function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+        async function attachCustomerEvents() {
+            document.getElementById('serviceDeliveryBtn').onclick = () => { serviceType = 'delivery'; renderMainApp(); };
+            document.getElementById('serviceTaxiBtn').onclick = () => { serviceType = 'taxi'; renderMainApp(); };
+            document.getElementById('pickupModeBtn').onclick = () => { window.mapSelectMode = 'pickup'; alert("Map click → PICKUP"); };
+            document.getElementById('dropoffModeBtn').onclick = () => { window.mapSelectMode = 'dropoff'; alert("Map click → DROPOFF"); };
+            document.getElementById('clearPickupBtn').onclick = () => { tempPickup = null; updatePickupDropoffDisplay(); updateAutomaticPrice(); };
+            document.getElementById('clearDropoffBtn').onclick = () => { tempDropoff = null; updatePickupDropoffDisplay(); updateAutomaticPrice(); };
+            document.getElementById('createRequestBtn').onclick = async () => {
+                if (!tempPickup || !tempDropoff) { alert("Set both pickup and dropoff"); return; }
+                let price = parseFloat(document.getElementById('priceInput').value);
+                if (isNaN(price)) price = calculatePrice(calculateDistance(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng), serviceType);
+                const detail = document.getElementById('cargoOrPassengers').value;
+                const paymentMethod = document.getElementById('paymentMethod').value;
+                const requestData = {
+                    customerId: currentUser.uid,
+                    customerName: currentUser.email,
+                    type: serviceType,
+                    cargoDetail: detail,
+                    price: price,
+                    paymentMethod: paymentMethod,
+                    status: 'pending',
+                    driverId: null,
+                    driverName: null,
+                    pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
+                    dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
+                    createdAt: Timestamp.now()
+                };
+                await addDoc(collection(window.firebaseDb, "requests"), requestData);
+                alert("Request published!");
+            };
+            document.getElementById('logoutBtn').onclick = async () => { await signOut(window.firebaseAuth); currentUser = null; renderLogin(); };
+            const searchInput = document.getElementById('globalSearchInput'), resultsDiv = document.getElementById('searchResults');
+            let timeoutId;
+            searchInput.addEventListener('input', async () => {
+                clearTimeout(timeoutId);
+                const query = searchInput.value;
+                if (query.length < 3) { resultsDiv.classList.add('hidden'); return; }
+                timeoutId = setTimeout(async () => {
+                    const results = await searchAddress(query);
+                    if (!results.length) { resultsDiv.classList.add('hidden'); return; }
+                    resultsDiv.innerHTML = results.map(r => `<div class="autocomplete-item" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0, 80)}</div>`).join('');
+                    resultsDiv.classList.remove('hidden');
+                    document.querySelectorAll('.autocomplete-item').forEach(el => {
+                        el.addEventListener('click', () => {
+                            window.lastSearchLocation = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng), name: el.dataset.name };
+                            searchInput.value = el.dataset.name;
+                            resultsDiv.classList.add('hidden');
+                        });
+                    });
+                }, 400);
+            });
+            document.getElementById('setAsPickupBtn').onclick = () => { if (window.lastSearchLocation) { tempPickup = { lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); } else alert("Search first"); };
+            document.getElementById('setAsDropoffBtn').onclick = () => { if (window.lastSearchLocation) { tempDropoff = { lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); } else alert("Search first"); };
+            document.getElementById('saveCurrentLocationBtn').onclick = async () => {
+                if (!window.lastSearchLocation) { alert("Search and select a location first"); return; }
+                const name = prompt("Name for this saved place:", "My Place");
+                if (!name) return;
+                savedPlaces.push({ name, lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng, address: window.lastSearchLocation.name });
+                await setDoc(doc(window.firebaseDb, "savedPlaces", currentUser.uid), { places: savedPlaces });
+                renderSavedPlaces();
+            };
+            document.addEventListener('click', (e) => { if (searchInput && !searchInput.contains(e.target) && resultsDiv && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
+        }
+        function refreshCustomerUI() {
+            if (!window.allRequests) return;
+            const myRequests = window.allRequests.filter(r => r.customerId === currentUser.uid);
+            const active = myRequests.find(r => ['pending','accepted','pickedUp'].includes(r.status));
+            const cardDiv = document.getElementById('customerActiveCard');
+            if (!active) cardDiv.innerHTML = '<p class="text-slate-400">No active request.</p>';
+            else cardDiv.innerHTML = `<div class="bg-slate-50 p-3 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY_SYMBOL}${active.price}<br/>Payment: ${active.paymentMethod || 'cash'}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}</div>`;
+            const past = myRequests.filter(r => r.status === 'delivered');
+            const historyDiv = document.getElementById('customerHistoryList');
+            historyDiv.innerHTML = past.length ? past.map(r => `<div>#${r.id.substring(0,6)} ${r.type} - ${CURRENCY_SYMBOL}${r.price}</div>`).join('') : '<div>No past trips</div>';
+            const activeWithDriver = myRequests.find(r => r.driverId && (r.status === 'accepted' || r.status === 'pickedUp'));
+            if (activeWithDriver && activeWithDriver.driverId) listenDriverLocation(activeWithDriver.driverId);
+            else if (window.driverLocationUnsubscribe) { window.driverLocationUnsubscribe(); if (window.custDriverMarker && window.customerMap) window.customerMap.removeLayer(window.custDriverMarker); }
+        }
+
+        // --- DRIVER DASHBOARD (minor adjustments for ZMW) ---
+        function renderDriverDashboard() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 py-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div><h2 class="text-2xl font-bold">🚚 Driver: ${currentUser.email}</h2><span id="driverStatusBadge" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">online</span></div>
+                        <button id="logoutDriverBtn" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl">Logout</button>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-2xl shadow p-4"><h3 class="font-bold mb-2">🗺️ Your location</h3><div id="driverMap" class="map-container"></div><div class="flex gap-2 mt-2"><button id="updateDriverGps" class="text-sm bg-slate-100 px-3 py-1 rounded-full"><i class="fas fa-location-dot"></i> Use GPS</button><button id="centerMap" class="text-sm bg-slate-100 px-3 py-1 rounded-full">Center</button></div></div>
+                        <div class="bg-white rounded-2xl shadow p-4"><h3 class="font-bold">📋 Available requests</h3><div id="availableList" class="max-h-64 overflow-auto space-y-2 mt-2 text-sm"></div></div>
+                    </div>
+                    <div class="mt-6 bg-white rounded-2xl shadow p-4"><h3 class="font-bold">Active trip</h3><div id="driverActiveTrip" class="mt-2 text-sm"></div><div id="dropoffInfoCard" class="mt-3 p-2 bg-emerald-50 rounded-lg text-sm hidden"><span class="font-semibold">🏁 Dropoff details</span><div id="dropoffAddress" class="text-xs"></div><div id="distanceToDropoff" class="text-xs"></div></div><div class="flex gap-2 mt-3"><button id="moveToPickupBtn" class="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>📍 Move to pickup</button><button id="moveToDropoffBtn" class="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>🏁 Move to dropoff</button><button id="markPickedUpBtn" class="bg-amber-100 text-amber-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>📦 Picked up</button><button id="markDeliveredBtn" class="bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>✅ Completed</button></div></div>
+                </div>
+            `;
+            initDriverMap();
+            attachDriverEvents();
+            refreshDriverUI();
+        }
+        function initDriverMap() {
+            if (driverMap) driverMap.remove();
+            const lat = window.driverData?.currentLat || -15.3875;
+            const lng = window.driverData?.currentLng || 28.3228;
+            driverMap = L.map('driverMap').setView([lat, lng], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(driverMap);
+            driverMarker = L.marker([lat, lng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap);
+            window.driverMap = driverMap;
+        }
+        async function updateDriverLocation(lat, lng) {
+            window.driverData.currentLat = lat;
+            window.driverData.currentLng = lng;
+            await updateDoc(doc(window.firebaseDb, "drivers", currentUser.uid), { currentLat: lat, currentLng: lng });
+            if (driverMarker) driverMarker.setLatLng([lat, lng]);
+            driverMap.setView([lat, lng], 13);
+            refreshDriverUI();
+        }
+        async function attachDriverEvents() {
+            document.getElementById('logoutDriverBtn').onclick = async () => { await signOut(window.firebaseAuth); currentUser = null; renderLogin(); };
+            document.getElementById('updateDriverGps').onclick = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => updateDriverLocation(pos.coords.latitude, pos.coords.longitude)); };
+            document.getElementById('centerMap').onclick = () => driverMap.setView([window.driverData.currentLat, window.driverData.currentLng], 14);
+            document.getElementById('moveToPickupBtn').onclick = async () => {
+                if (window.driverData.activeRequestId) {
+                    const trip = window.allRequests.find(r => r.id === window.driverData.activeRequestId);
+                    if (trip) await updateDriverLocation(trip.pickupLatLng.lat, trip.pickupLatLng.lng);
+                }
+            };
+            document.getElementById('moveToDropoffBtn').onclick = async () => {
+                if (window.driverData.activeRequestId) {
+                    const trip = window.allRequests.find(r => r.id === window.driverData.activeRequestId);
+                    if (trip) await updateDriverLocation(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
+                }
+            };
+            document.getElementById('markPickedUpBtn').onclick = async () => {
+                if (window.driverData.activeRequestId) {
+                    const tripRef = doc(window.firebaseDb, "requests", window.driverData.activeRequestId);
+                    const trip = window.allRequests.find(r => r.id === window.driverData.activeRequestId);
+                    if (trip && trip.status === 'accepted') await updateDoc(tripRef, { status: 'pickedUp' });
+                }
+            };
+            document.getElementById('markDeliveredBtn').onclick = async () => {
+                if (window.driverData.activeRequestId) {
+                    const tripRef = doc(window.firebaseDb, "requests", window.driverData.activeRequestId);
+                    const trip = window.allRequests.find(r => r.id === window.driverData.activeRequestId);
+                    if (trip && trip.status === 'pickedUp') {
+                        await updateDoc(tripRef, { status: 'delivered' });
+                        await updateDoc(doc(window.firebaseDb, "drivers", currentUser.uid), { activeRequestId: null, status: "online" });
+                        window.driverData.activeRequestId = null;
+                        window.driverData.status = "online";
+                        refreshDriverUI();
+                    }
+                }
+            };
+        }
+        function refreshDriverUI() {
+            if (!window.allRequests) return;
+            const pending = window.allRequests.filter(r => r.status === 'pending');
+            const availDiv = document.getElementById('availableList');
+            if (pending.length === 0) availDiv.innerHTML = '<div class="text-slate-400">No requests</div>';
+            else availDiv.innerHTML = pending.map(req => `
+                <div class="border p-3 rounded-xl"><div class="flex justify-between"><span class="font-bold">${req.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery'}</span><span>${CURRENCY_SYMBOL}${req.price}</span></div><div class="text-xs">${req.customerName} | ${req.cargoDetail}</div><div class="text-xs text-slate-500">Payment: ${req.paymentMethod || 'cash'}</div><button class="acceptReq bg-amber-500 text-white px-3 py-1 rounded-full text-xs mt-2" data-id="${req.id}">Accept</button></div>
+            `).join('');
+            document.querySelectorAll('.acceptReq').forEach(btn => btn.addEventListener('click', async (e) => {
+                const reqId = btn.dataset.id;
+                const req = window.allRequests.find(r => r.id === reqId);
+                if (req && req.status === 'pending' && window.driverData.status !== 'busy') {
+                    const tripRef = doc(window.firebaseDb, "requests", reqId);
+                    await updateDoc(tripRef, { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
+                    await updateDoc(doc(window.firebaseDb, "drivers", currentUser.uid), { activeRequestId: reqId, status: "busy" });
+                    window.driverData.activeRequestId = reqId;
+                    window.driverData.status = "busy";
+                    refreshDriverUI();
+                } else alert("Cannot accept");
+            }));
+            const activeId = window.driverData?.activeRequestId;
+            const tripDiv = document.getElementById('driverActiveTrip');
+            if (!activeId) tripDiv.innerHTML = '<p>No active trip</p>';
+            else {
+                const trip = window.allRequests.find(r => r.id === activeId);
+                if (trip) tripDiv.innerHTML = `<div class="bg-amber-50 p-2 rounded">Trip #${trip.id.substring(0,6)} (${trip.type}) - ${trip.cargoDetail}<br/>Price: ${CURRENCY_SYMBOL}${trip.price}<br/>Payment: ${trip.paymentMethod || 'cash'}<br/>Status: ${trip.status}</div>`;
+                else tripDiv.innerHTML = '<p>Loading...</p>';
+                const dropoffCard = document.getElementById('dropoffInfoCard');
+                if (trip && trip.dropoffLatLng) {
+                    dropoffCard.classList.remove('hidden');
+                    document.getElementById('dropoffAddress').innerText = `${trip.dropoffLatLng.lat.toFixed(5)}, ${trip.dropoffLatLng.lng.toFixed(5)}`;
+                    const dist = calculateDistance(window.driverData.currentLat, window.driverData.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
+                    document.getElementById('distanceToDropoff').innerHTML = `Distance: ${dist.toFixed(2)} km`;
+                } else dropoffCard.classList.add('hidden');
+            }
+            const movePickup = document.getElementById('moveToPickupBtn'), moveDrop = document.getElementById('moveToDropoffBtn'), pickupBtn = document.getElementById('markPickedUpBtn'), deliverBtn = document.getElementById('markDeliveredBtn');
+            if (activeId) {
+                const trip = window.allRequests.find(r => r.id === activeId);
+                if (trip) { movePickup.disabled = false; moveDrop.disabled = false; pickupBtn.disabled = (trip.status !== 'accepted'); deliverBtn.disabled = (trip.status !== 'pickedUp'); }
+                else disableAll();
+            } else disableAll();
+            function disableAll() { movePickup.disabled = true; moveDrop.disabled = true; pickupBtn.disabled = true; deliverBtn.disabled = true; }
+            const badge = document.getElementById('driverStatusBadge');
+            if (badge) badge.innerText = window.driverData.status;
+        }
+
+        // Start the app
+        onAuthStateChanged(window.firebaseAuth, async (user) => {
+            if (user) { currentUser = user; await loadUserData(user.uid); listenRequests(); renderMainApp(); }
+            else renderLogin();
+        });
+    </script>
+</body>
+</html>

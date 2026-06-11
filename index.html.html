@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiMove - Drop-off Section Added</title>
+    <!-- Leaflet CSS + JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Tailwind + Font Awesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .map-container { height: 240px; width: 100%; border-radius: 16px; z-index: 1; }
+        .badge-status { padding: 4px 10px; border-radius: 40px; font-size: 0.7rem; font-weight: bold; }
+        .login-container { max-width: 450px; }
+        .saved-place-item { background: #f8fafc; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; cursor: pointer; transition: 0.1s; }
+        .saved-place-item:hover { background: #e2e8f0; }
+        button:active { transform: scale(0.97); transition: 0.05s; }
+        .autocomplete-results { position: absolute; z-index: 1000; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; width: 100%; }
+        .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #e2e8f0; font-size: 0.8rem; }
+        .autocomplete-item:hover { background: #f1f5f9; }
+        .register-section { border-top: 1px solid #e2e8f0; margin-top: 1rem; padding-top: 1rem; }
+        .register-form { display: none; margin-top: 0.75rem; gap: 0.5rem; flex-direction: column; }
+        .register-form.active { display: flex; }
+        .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 font-sans antialiased">
+
+    <div id="appContainer"></div>
+
+    <script>
+        // ---------- STORAGE KEYS ----------
+        const STORAGE_USERS = 'logimove_users';
+        const STORAGE_REQUESTS = 'logimove_requests';
+        const STORAGE_SESSION = 'logimove_session';
+        const STORAGE_SAVED_PLACES = 'logimove_saved_places';
+
+        // ---------- PRICING RATES ----------
+        const RATES = {
+            taxi: { base: 2.5, perKm: 1.5 },
+            delivery: { base: 3.0, perKm: 1.2 }
+        };
+
+        // ---------- DATA MODELS ----------
+        let allRequests = [];
+        let nextRequestId = 1000;
+        let users = [];
+        let currentUser = null;
+        let tempPickup = null, tempDropoff = null;
+        let serviceType = "delivery";
+        let customerMap, driverMap;
+        let pickupMarker = null, dropoffMarker = null;
+        let driverMarker = null;
+        let driverRoutePickup = null, driverRouteDropoff = null;
+        let savedPlaces = [];
+
+        // Helper: distance in km (Haversine)
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function calculatePrice(distanceKm, type) {
+            const rate = RATES[type];
+            if (!rate) return 5;
+            let price = rate.base + (distanceKm * rate.perKm);
+            return Math.round(price * 100) / 100;
+        }
+
+        function updateAutomaticPrice() {
+            if (!tempPickup || !tempDropoff) return;
+            const dist = calculateDistance(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
+            const computed = calculatePrice(dist, serviceType);
+            const priceInput = document.getElementById('priceInput');
+            if (priceInput && !priceInput.disabled) priceInput.value = computed;
+            const distSpan = document.getElementById('distanceDisplay');
+            if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
+            const autoSpan = document.getElementById('autoPriceDisplay');
+            if (autoSpan) autoSpan.innerText = `$${computed.toFixed(2)}`;
+            return dist;
+        }
+
+        function saveAllData() {
+            localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+            localStorage.setItem(STORAGE_REQUESTS, JSON.stringify(allRequests));
+            localStorage.setItem(STORAGE_SAVED_PLACES, JSON.stringify(savedPlaces));
+            if (currentUser) localStorage.setItem(STORAGE_SESSION, JSON.stringify({ userId: currentUser.id, role: currentUser.role }));
+            else localStorage.removeItem(STORAGE_SESSION);
+        }
+
+        function loadAllData() {
+            const storedUsers = localStorage.getItem(STORAGE_USERS);
+            if (storedUsers) users = JSON.parse(storedUsers);
+            else {
+                users = [
+                    { id: "cust_1", email: "customer@logi.com", password: "123", name: "Alice Chen", role: "customer" },
+                    { id: "drv_1", email: "driver@logi.com", password: "123", name: "Mike Driver", role: "driver", currentLat: 40.7128, currentLng: -74.0060, status: "online", activeRequestId: null }
+                ];
+            }
+            const storedReqs = localStorage.getItem(STORAGE_REQUESTS);
+            if (storedReqs) allRequests = JSON.parse(storedReqs);
+            else allRequests = [];
+            if (allRequests.length) nextRequestId = Math.max(...allRequests.map(r=>r.id)) + 1;
+            
+            const storedPlaces = localStorage.getItem(STORAGE_SAVED_PLACES);
+            if (storedPlaces) savedPlaces = JSON.parse(storedPlaces);
+            else savedPlaces = [];
+
+            const session = localStorage.getItem(STORAGE_SESSION);
+            if (session) {
+                try {
+                    const { userId, role } = JSON.parse(session);
+                    const found = users.find(u => u.id === userId && u.role === role);
+                    if (found) {
+                        currentUser = { ...found };
+                        if (currentUser.role === "driver" && !currentUser.currentLat) {
+                            currentUser.currentLat = 40.7128;
+                            currentUser.currentLng = -74.0060;
+                            currentUser.status = "online";
+                            currentUser.activeRequestId = null;
+                        }
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // ---------- LOGIN & REGISTRATION UI ----------
+        function renderLogin() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-xl w-full login-container p-6">
+                        <div class="text-center mb-5">
+                            <div class="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                                <i class="fas fa-truck-fast text-white text-3xl"></i>
+                            </div>
+                            <h1 class="text-2xl font-extrabold mt-3 text-slate-800">Logi<span class="text-indigo-600">Move</span></h1>
+                            <p class="text-slate-500 text-sm">Delivery & Taxi • Dropoff section added</p>
+                        </div>
+                        <div class="space-y-3">
+                            <input type="email" id="loginEmail" placeholder="Email" class="w-full border border-slate-300 rounded-xl px-4 py-2">
+                            <input type="password" id="loginPassword" placeholder="Password" class="w-full border border-slate-300 rounded-xl px-4 py-2">
+                            <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl">Login</button>
+                            <div class="text-center text-xs text-slate-500">Demo: customer@logi.com / 123 &nbsp;|&nbsp; driver@logi.com / 123</div>
+                        </div>
+
+                        <div class="register-section">
+                            <div class="flex gap-3 text-sm">
+                                <button id="showCustomerReg" class="flex-1 bg-indigo-50 text-indigo-600 py-1 rounded-full">➕ New Customer</button>
+                                <button id="showDriverReg" class="flex-1 bg-amber-50 text-amber-600 py-1 rounded-full">🚚 New Driver</button>
+                            </div>
+                            <div id="customerRegForm" class="register-form">
+                                <input type="text" id="custRegName" placeholder="Full name" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="email" id="custRegEmail" placeholder="Email" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="password" id="custRegPassword" placeholder="Password" class="border rounded-lg px-3 py-1 text-sm">
+                                <button id="doCustomerReg" class="bg-indigo-500 text-white py-1 rounded-lg text-sm">Register & Login</button>
+                            </div>
+                            <div id="driverRegForm" class="register-form">
+                                <input type="text" id="driverRegName" placeholder="Full name" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="email" id="driverRegEmail" placeholder="Email" class="border rounded-lg px-3 py-1 text-sm">
+                                <input type="password" id="driverRegPassword" placeholder="Password" class="border rounded-lg px-3 py-1 text-sm">
+                                <button id="doDriverReg" class="bg-amber-500 text-white py-1 rounded-lg text-sm">Register & Login</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('loginBtn').onclick = () => {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pwd = document.getElementById('loginPassword').value;
+                const user = users.find(u => u.email === email && u.password === pwd);
+                if (!user) { alert("Invalid credentials"); return; }
+                currentUser = { ...user };
+                if (currentUser.role === "driver" && !currentUser.currentLat) {
+                    currentUser.currentLat = 40.7128;
+                    currentUser.currentLng = -74.0060;
+                    currentUser.status = "online";
+                    currentUser.activeRequestId = null;
+                    const idx = users.findIndex(u => u.id === currentUser.id);
+                    if (idx !== -1) users[idx] = { ...users[idx], ...currentUser };
+                }
+                saveAllData();
+                renderMainApp();
+            };
+            document.getElementById('showCustomerReg').onclick = () => { document.getElementById('customerRegForm').classList.add('active'); document.getElementById('driverRegForm').classList.remove('active'); };
+            document.getElementById('showDriverReg').onclick = () => { document.getElementById('driverRegForm').classList.add('active'); document.getElementById('customerRegForm').classList.remove('active'); };
+            document.getElementById('doCustomerReg').onclick = () => {
+                const name = document.getElementById('custRegName').value.trim();
+                const email = document.getElementById('custRegEmail').value.trim();
+                const pwd = document.getElementById('custRegPassword').value;
+                if (!name || !email || !pwd) { alert("All fields required"); return; }
+                if (users.find(u => u.email === email)) { alert("Email exists"); return; }
+                const newId = `cust_${Date.now()}`;
+                const newUser = { id: newId, email, password: pwd, name, role: "customer" };
+                users.push(newUser);
+                saveAllData();
+                currentUser = { ...newUser };
+                renderMainApp();
+            };
+            document.getElementById('doDriverReg').onclick = () => {
+                const name = document.getElementById('driverRegName').value.trim();
+                const email = document.getElementById('driverRegEmail').value.trim();
+                const pwd = document.getElementById('driverRegPassword').value;
+                if (!name || !email || !pwd) { alert("All fields required"); return; }
+                if (users.find(u => u.email === email)) { alert("Email exists"); return; }
+                const newId = `drv_${Date.now()}`;
+                const newUser = { id: newId, email, password: pwd, name, role: "driver", currentLat: 40.7128, currentLng: -74.0060, status: "online", activeRequestId: null };
+                users.push(newUser);
+                saveAllData();
+                currentUser = { ...newUser };
+                renderMainApp();
+            };
+        }
+
+        function renderMainApp() {
+            if (!currentUser) { renderLogin(); return; }
+            if (currentUser.role === 'customer') renderCustomerDashboard();
+            else renderDriverDashboard();
+        }
+
+        // ========== CUSTOMER DASHBOARD with dedicated Dropoff section ==========
+        function renderCustomerDashboard() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 py-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center"><i class="fas fa-user text-white"></i></div>
+                            <div><h2 class="font-bold text-xl">Hello, ${currentUser.name}</h2><p class="text-xs text-slate-500">Customer</p></div>
+                        </div>
+                        <button id="logoutBtn" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-md p-5 mb-6">
+                        <div class="flex gap-4 border-b pb-3 mb-4">
+                            <button id="serviceDeliveryBtn" class="service-toggle px-4 py-2 rounded-full font-semibold ${serviceType === 'delivery' ? 'bg-indigo-600 text-white' : 'bg-slate-100'}"><i class="fas fa-box"></i> Delivery</button>
+                            <button id="serviceTaxiBtn" class="service-toggle px-4 py-2 rounded-full font-semibold ${serviceType === 'taxi' ? 'bg-indigo-600 text-white' : 'bg-slate-100'}"><i class="fas fa-taxi"></i> Taxi</button>
+                        </div>
+
+                        <!-- Global search & saved places (shared) -->
+                        <div class="mb-4">
+                            <div class="relative">
+                                <input type="text" id="globalSearchInput" placeholder="Search any address worldwide..." class="w-full border border-slate-300 rounded-xl px-4 py-2 pr-10 text-sm">
+                                <i class="fas fa-search absolute right-3 top-3 text-slate-400"></i>
+                                <div id="searchResults" class="autocomplete-results hidden"></div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <button id="setAsPickupBtn" class="text-xs bg-indigo-100 px-2 py-1 rounded-full">📍 Set as pickup</button>
+                                <button id="setAsDropoffBtn" class="text-xs bg-emerald-100 px-2 py-1 rounded-full">🏁 Set as dropoff</button>
+                                <button id="saveCurrentLocationBtn" class="text-xs bg-amber-100 px-2 py-1 rounded-full"><i class="fas fa-save"></i> Save current location</button>
+                            </div>
+                        </div>
+
+                        <!-- Saved places (both roles) -->
+                        <div class="mb-3">
+                            <span class="text-xs font-semibold text-slate-500">⭐ SAVED PLACES</span>
+                            <div id="savedPlacesList" class="flex flex-wrap gap-2 mt-1"></div>
+                        </div>
+
+                        <!-- PICKUP SECTION -->
+                        <div class="location-card border border-indigo-200">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-indigo-700"><i class="fas fa-map-marker-alt"></i> PICKUP</span>
+                                <button id="pickupModeBtn" class="text-xs bg-indigo-100 px-2 py-1 rounded-full">Set on map</button>
+                            </div>
+                            <div id="pickupCoordDisplay" class="text-sm font-mono bg-white p-2 rounded border">Not set</div>
+                            <button id="clearPickupBtn" class="text-xs text-red-500 mt-1">Clear pickup</button>
+                        </div>
+
+                        <!-- DROPOFF SECTION (dedicated) -->
+                        <div class="location-card border border-emerald-200 mt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-emerald-700"><i class="fas fa-flag-checkered"></i> DROPOFF</span>
+                                <button id="dropoffModeBtn" class="text-xs bg-emerald-100 px-2 py-1 rounded-full">Set on map</button>
+                            </div>
+                            <div id="dropoffCoordDisplay" class="text-sm font-mono bg-white p-2 rounded border">Not set</div>
+                            <button id="clearDropoffBtn" class="text-xs text-red-500 mt-1">Clear dropoff</button>
+                        </div>
+
+                        <!-- Map -->
+                        <div class="mt-3 mb-3">
+                            <div id="customerMap" class="map-container border"></div>
+                            <p class="text-[11px] text-slate-400 mt-1">Click map after choosing "Set on map" mode</p>
+                        </div>
+
+                        <!-- Distance & Price -->
+                        <div class="mt-2 p-2 bg-indigo-50 rounded-lg text-sm">
+                            <div class="flex justify-between"><span><i class="fas fa-route"></i> Distance:</span><span id="distanceDisplay">— km</span></div>
+                            <div class="flex justify-between mt-1"><span><i class="fas fa-dollar-sign"></i> Auto price:</span><span id="autoPriceDisplay">—</span></div>
+                            <p class="text-[11px] text-slate-500 mt-1">You can edit the price below</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mt-2">
+                            <div>
+                                <label class="text-sm font-medium">${serviceType === 'delivery' ? 'Cargo type' : 'Passengers'}</label>
+                                <select id="cargoOrPassengers" class="w-full border rounded-xl p-2">
+                                    ${serviceType === 'delivery' ? '<option>Package</option><option>Box</option><option>Furniture</option>' : '<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Price $</label>
+                                <input type="number" id="priceInput" step="0.5" class="w-full border rounded-xl p-2">
+                            </div>
+                        </div>
+                        <button id="createRequestBtn" class="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-bold">Publish Request</button>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-md p-5">
+                        <h3 class="font-bold">Your active request</h3>
+                        <div id="customerActiveCard" class="mt-2 text-sm">No active requests.</div>
+                        <details class="mt-3"><summary class="cursor-pointer text-slate-500">Past requests</summary><div id="customerHistoryList" class="mt-2 max-h-40 overflow-auto text-xs"></div></details>
+                    </div>
+                </div>
+            `;
+            initCustomerMap();
+            attachCustomerEvents();
+            refreshCustomerUI();
+            renderSavedPlaces();
+            if (tempPickup && tempDropoff) updateAutomaticPrice();
+        }
+
+        function initCustomerMap() {
+            if (customerMap) customerMap.remove();
+            customerMap = L.map('customerMap').setView([40.7128, -74.006], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
+            customerMap.on('click', (e) => {
+                if (window.mapSelectMode === 'pickup') { tempPickup = e.latlng; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                else if (window.mapSelectMode === 'dropoff') { tempDropoff = e.latlng; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+            });
+            if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
+            if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
+        }
+
+        function updatePickupDropoffDisplay() {
+            document.getElementById('pickupCoordDisplay').innerHTML = tempPickup ? `${tempPickup.lat.toFixed(5)}, ${tempPickup.lng.toFixed(5)}` : 'Not set';
+            document.getElementById('dropoffCoordDisplay').innerHTML = tempDropoff ? `${tempDropoff.lat.toFixed(5)}, ${tempDropoff.lng.toFixed(5)}` : 'Not set';
+            if (customerMap) {
+                if (pickupMarker) customerMap.removeLayer(pickupMarker);
+                if (dropoffMarker) customerMap.removeLayer(dropoffMarker);
+                if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap);
+                if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap);
+            }
+        }
+
+        function renderSavedPlaces() {
+            const container = document.getElementById('savedPlacesList');
+            if (!container) return;
+            if (savedPlaces.length === 0) { container.innerHTML = '<span class="text-xs text-slate-400">No saved places yet.</span>'; return; }
+            container.innerHTML = savedPlaces.map(place => `
+                <div class="saved-place-item flex items-center gap-1" data-lat="${place.lat}" data-lng="${place.lng}" data-name="${place.name}">
+                    <i class="fas fa-map-pin text-indigo-400 text-xs"></i>
+                    <span>${escapeHtml(place.name)}</span>
+                    <i class="fas fa-trash-alt text-red-400 text-xs ml-1 delete-saved" data-name="${place.name}" style="cursor:pointer"></i>
+                </div>
+            `).join('');
+            document.querySelectorAll('.saved-place-item').forEach(el => {
+                const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), name = el.dataset.name;
+                el.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-saved')) return;
+                    // Default: use as dropoff? But let's ask: use as pickup or dropoff based on mode
+                    if (window.mapSelectMode === 'pickup') { tempPickup = { lat, lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                    else { tempDropoff = { lat, lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); }
+                });
+                const delBtn = el.querySelector('.delete-saved');
+                if (delBtn) delBtn.addEventListener('click', (e) => { e.stopPropagation(); savedPlaces = savedPlaces.filter(p => p.name !== name); saveAllData(); renderSavedPlaces(); });
+            });
+        }
+
+        function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+        async function searchAddress(query) {
+            if (!query.trim()) return [];
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`;
+            try { const res = await fetch(url); const data = await res.json(); return data.map(item => ({ lat: parseFloat(item.lat), lng: parseFloat(item.lon), display_name: item.display_name })); } catch(e) { return []; }
+        }
+
+        function attachCustomerEvents() {
+            document.getElementById('serviceDeliveryBtn').onclick = () => { serviceType = 'delivery'; renderMainApp(); };
+            document.getElementById('serviceTaxiBtn').onclick = () => { serviceType = 'taxi'; renderMainApp(); };
+            document.getElementById('pickupModeBtn').onclick = () => { window.mapSelectMode = 'pickup'; alert("Map click will set PICKUP"); };
+            document.getElementById('dropoffModeBtn').onclick = () => { window.mapSelectMode = 'dropoff'; alert("Map click will set DROPOFF"); };
+            document.getElementById('clearPickupBtn').onclick = () => { tempPickup = null; updatePickupDropoffDisplay(); updateAutomaticPrice(); };
+            document.getElementById('clearDropoffBtn').onclick = () => { tempDropoff = null; updatePickupDropoffDisplay(); updateAutomaticPrice(); };
+            document.getElementById('createRequestBtn').onclick = () => {
+                if (!tempPickup || !tempDropoff) { alert("Set both pickup and dropoff"); return; }
+                let price = parseFloat(document.getElementById('priceInput').value);
+                if (isNaN(price)) price = calculatePrice(calculateDistance(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng), serviceType);
+                const detail = document.getElementById('cargoOrPassengers').value;
+                const newReq = {
+                    id: nextRequestId++, customerId: currentUser.id, customerName: currentUser.name, type: serviceType, cargoDetail: detail, price: price,
+                    status: 'pending', driverId: null, driverName: null,
+                    pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng }, dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
+                    pickupDesc: `${tempPickup.lat.toFixed(4)},${tempPickup.lng.toFixed(4)}`, dropoffDesc: `${tempDropoff.lat.toFixed(4)},${tempDropoff.lng.toFixed(4)}`,
+                    createdAt: Date.now()
+                };
+                allRequests.push(newReq);
+                saveAllData();
+                alert("Request published!");
+                refreshCustomerUI();
+            };
+            document.getElementById('logoutBtn').onclick = () => { currentUser = null; saveAllData(); renderLogin(); };
+            const searchInput = document.getElementById('globalSearchInput'), resultsDiv = document.getElementById('searchResults');
+            let timeoutId;
+            searchInput.addEventListener('input', async () => {
+                clearTimeout(timeoutId);
+                const query = searchInput.value;
+                if (query.length < 3) { resultsDiv.classList.add('hidden'); return; }
+                timeoutId = setTimeout(async () => {
+                    const results = await searchAddress(query);
+                    if (!results.length) { resultsDiv.classList.add('hidden'); return; }
+                    resultsDiv.innerHTML = results.map(r => `<div class="autocomplete-item" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0, 80)}</div>`).join('');
+                    resultsDiv.classList.remove('hidden');
+                    document.querySelectorAll('.autocomplete-item').forEach(el => {
+                        el.addEventListener('click', () => {
+                            window.lastSearchLocation = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng), name: el.dataset.name };
+                            searchInput.value = el.dataset.name;
+                            resultsDiv.classList.add('hidden');
+                        });
+                    });
+                }, 400);
+            });
+            document.getElementById('setAsPickupBtn').onclick = () => { if (window.lastSearchLocation) { tempPickup = { lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); } else alert("Search first"); };
+            document.getElementById('setAsDropoffBtn').onclick = () => { if (window.lastSearchLocation) { tempDropoff = { lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng }; updatePickupDropoffDisplay(); updateAutomaticPrice(); } else alert("Search first"); };
+            document.getElementById('saveCurrentLocationBtn').onclick = () => {
+                if (!window.lastSearchLocation) { alert("Search and select a location first"); return; }
+                const name = prompt("Name for this saved place:", "My Place");
+                if (!name) return;
+                savedPlaces.push({ name, lat: window.lastSearchLocation.lat, lng: window.lastSearchLocation.lng, address: window.lastSearchLocation.name });
+                saveAllData();
+                renderSavedPlaces();
+            };
+            document.addEventListener('click', (e) => { if (searchInput && !searchInput.contains(e.target) && resultsDiv && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
+        }
+
+        function refreshCustomerUI() {
+            const activeReq = allRequests.find(r => r.customerId === currentUser.id && (r.status === 'pending' || r.status === 'accepted' || r.status === 'pickedUp'));
+            const cardDiv = document.getElementById('customerActiveCard');
+            if (!activeReq) cardDiv.innerHTML = '<p class="text-slate-400">No active request.</p>';
+            else cardDiv.innerHTML = `<div class="bg-slate-50 p-3 rounded-lg"><span class="font-bold">#${activeReq.id} ${activeReq.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery'}</span> - ${activeReq.cargoDetail}<br/>Status: <span class="badge-status bg-indigo-100">${activeReq.status}</span><br/>Price: $${activeReq.price}<br/>${activeReq.driverName ? `Driver: ${activeReq.driverName}` : 'Waiting...'}</div>`;
+            const pastReqs = allRequests.filter(r => r.customerId === currentUser.id && (r.status === 'delivered' || r.status === 'cancelled'));
+            const historyDiv = document.getElementById('customerHistoryList');
+            historyDiv.innerHTML = pastReqs.length ? pastReqs.map(r => `<div class="border-b py-1">#${r.id} ${r.type} - $${r.price} (${r.status})</div>`).join('') : '<div class="text-slate-400">No past trips</div>';
+        }
+
+        // ========== DRIVER DASHBOARD with Dropoff Info ==========
+        function renderDriverDashboard() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 py-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div><h2 class="text-2xl font-bold">🚚 Driver: ${currentUser.name}</h2><span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><i class="fas fa-circle text-[8px]"></i> ${currentUser.status}</span></div>
+                        <button id="logoutDriverBtn" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl">Logout</button>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-2xl shadow p-4">
+                            <h3 class="font-bold mb-2">🗺️ Your live location</h3>
+                            <div id="driverMap" class="map-container"></div>
+                            <div class="flex gap-2 mt-2"><button id="updateDriverGps" class="text-sm bg-slate-100 px-3 py-1 rounded-full"><i class="fas fa-location-dot"></i> Use GPS</button><button id="centerMap" class="text-sm bg-slate-100 px-3 py-1 rounded-full">Center</button></div>
+                        </div>
+                        <div class="bg-white rounded-2xl shadow p-4">
+                            <h3 class="font-bold">📋 Available requests</h3>
+                            <div id="availableList" class="max-h-64 overflow-auto space-y-2 mt-2 text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-white rounded-2xl shadow p-4">
+                        <h3 class="font-bold">Active trip</h3>
+                        <div id="driverActiveTrip" class="mt-2 text-sm"></div>
+                        <!-- Dropoff Info Section -->
+                        <div id="dropoffInfoCard" class="mt-3 p-2 bg-emerald-50 rounded-lg text-sm hidden">
+                            <span class="font-semibold"><i class="fas fa-flag-checkered"></i> Dropoff details</span>
+                            <div id="dropoffAddress" class="text-xs font-mono break-all">—</div>
+                            <div id="distanceToDropoff" class="text-xs mt-1">Distance from you: —</div>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <button id="moveToPickupBtn" class="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>📍 Move to pickup</button>
+                            <button id="moveToDropoffBtn" class="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>🏁 Move to dropoff</button>
+                            <button id="markPickedUpBtn" class="bg-amber-100 text-amber-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>📦 Picked up</button>
+                            <button id="markDeliveredBtn" class="bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg disabled:opacity-40" disabled>✅ Completed</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            initDriverMap();
+            attachDriverEvents();
+            refreshDriverUI();
+        }
+
+        function initDriverMap() {
+            if (driverMap) driverMap.remove();
+            driverMap = L.map('driverMap').setView([currentUser.currentLat, currentUser.currentLng], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(driverMap);
+            driverMarker = L.marker([currentUser.currentLat, currentUser.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24], className: 'drop-shadow' }) }).addTo(driverMap);
+        }
+
+        function updateDriverMapPosition() {
+            if (driverMarker) driverMarker.setLatLng([currentUser.currentLat, currentUser.currentLng]);
+            driverMap.setView([currentUser.currentLat, currentUser.currentLng], 13);
+            if (currentUser.activeRequestId) {
+                const trip = allRequests.find(r => r.id === currentUser.activeRequestId);
+                if (trip) {
+                    if (driverRoutePickup) driverMap.removeLayer(driverRoutePickup);
+                    if (driverRouteDropoff) driverMap.removeLayer(driverRouteDropoff);
+                    driverRoutePickup = L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
+                    driverRouteDropoff = L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
+                    // Update dropoff info card
+                    const dropoffCard = document.getElementById('dropoffInfoCard');
+                    if (dropoffCard) {
+                        dropoffCard.classList.remove('hidden');
+                        document.getElementById('dropoffAddress').innerText = `${trip.dropoffLatLng.lat.toFixed(5)}, ${trip.dropoffLatLng.lng.toFixed(5)}`;
+                        const distToDropoff = calculateDistance(currentUser.currentLat, currentUser.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
+                        document.getElementById('distanceToDropoff').innerHTML = `Distance from you: ${distToDropoff.toFixed(2)} km`;
+                    }
+                }
+            } else {
+                if (driverRoutePickup) driverMap.removeLayer(driverRoutePickup);
+                if (driverRouteDropoff) driverMap.removeLayer(driverRouteDropoff);
+                const dropoffCard = document.getElementById('dropoffInfoCard');
+                if (dropoffCard) dropoffCard.classList.add('hidden');
+            }
+        }
+
+        function attachDriverEvents() {
+            document.getElementById('logoutDriverBtn').onclick = () => { currentUser = null; saveAllData(); renderLogin(); };
+            document.getElementById('updateDriverGps').onclick = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { currentUser.currentLat = pos.coords.latitude; currentUser.currentLng = pos.coords.longitude; updateDriverInUsersArray(); saveAllData(); updateDriverMapPosition(); refreshDriverUI(); }); };
+            document.getElementById('centerMap').onclick = () => driverMap.setView([currentUser.currentLat, currentUser.currentLng], 14);
+            document.getElementById('moveToPickupBtn').onclick = () => { if (currentUser.activeRequestId) { const trip = allRequests.find(r => r.id === currentUser.activeRequestId); if (trip) { currentUser.currentLat = trip.pickupLatLng.lat; currentUser.currentLng = trip.pickupLatLng.lng; updateDriverInUsersArray(); saveAllData(); updateDriverMapPosition(); refreshDriverUI(); } } };
+            document.getElementById('moveToDropoffBtn').onclick = () => { if (currentUser.activeRequestId) { const trip = allRequests.find(r => r.id === currentUser.activeRequestId); if (trip) { currentUser.currentLat = trip.dropoffLatLng.lat; currentUser.currentLng = trip.dropoffLatLng.lng; updateDriverInUsersArray(); saveAllData(); updateDriverMapPosition(); refreshDriverUI(); } } };
+            document.getElementById('markPickedUpBtn').onclick = () => { if (currentUser.activeRequestId) { const trip = allRequests.find(r => r.id === currentUser.activeRequestId); if (trip && trip.status === 'accepted') { trip.status = 'pickedUp'; saveAllData(); refreshDriverUI(); } } };
+            document.getElementById('markDeliveredBtn').onclick = () => { if (currentUser.activeRequestId) { const trip = allRequests.find(r => r.id === currentUser.activeRequestId); if (trip && trip.status === 'pickedUp') { trip.status = 'delivered'; currentUser.activeRequestId = null; currentUser.status = 'online'; updateDriverInUsersArray(); saveAllData(); refreshDriverUI(); } } };
+        }
+
+        function updateDriverInUsersArray() { const idx = users.findIndex(u => u.id === currentUser.id); if (idx !== -1) users[idx] = { ...currentUser }; }
+
+        function refreshDriverUI() {
+            const pending = allRequests.filter(r => r.status === 'pending');
+            const availDiv = document.getElementById('availableList');
+            if (pending.length === 0) availDiv.innerHTML = '<div class="text-slate-400 text-center">No requests</div>';
+            else availDiv.innerHTML = pending.map(req => `<div class="border p-3 rounded-xl"><div class="flex justify-between"><span class="font-bold">${req.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery'}</span><span class="text-indigo-600 font-bold">$${req.price}</span></div><div class="text-xs">Customer: ${req.customerName} | ${req.cargoDetail}</div><button class="acceptReq mt-2 bg-amber-500 text-white px-3 py-1 rounded-full text-xs" data-id="${req.id}">Accept</button></div>`).join('');
+            document.querySelectorAll('.acceptReq').forEach(btn => btn.addEventListener('click', (e) => { const reqId = parseInt(btn.dataset.id); const req = allRequests.find(r => r.id === reqId); if (req && req.status === 'pending' && currentUser.status !== 'busy') { req.status = 'accepted'; req.driverId = currentUser.id; req.driverName = currentUser.name; currentUser.status = 'busy'; currentUser.activeRequestId = req.id; updateDriverInUsersArray(); saveAllData(); refreshDriverUI(); } else alert("Cannot accept"); }));
+            const activeId = currentUser.activeRequestId;
+            const tripDiv = document.getElementById('driverActiveTrip');
+            if (!activeId) tripDiv.innerHTML = '<p class="text-slate-400">No active trip</p>';
+            else { const trip = allRequests.find(r => r.id === activeId); if (trip) tripDiv.innerHTML = `<div class="bg-amber-50 p-2 rounded">Trip #${trip.id} (${trip.type}) - ${trip.cargoDetail}<br/>Status: ${trip.status}</div>`; }
+            const movePickup = document.getElementById('moveToPickupBtn'), moveDrop = document.getElementById('moveToDropoffBtn'), pickupBtn = document.getElementById('markPickedUpBtn'), deliverBtn = document.getElementById('markDeliveredBtn');
+            if (activeId) { const trip = allRequests.find(r => r.id === activeId); if (trip) { movePickup.disabled = false; moveDrop.disabled = false; pickupBtn.disabled = (trip.status !== 'accepted'); deliverBtn.disabled = (trip.status !== 'pickedUp'); } else disableAll(); } else disableAll();
+            function disableAll() { movePickup.disabled = true; moveDrop.disabled = true; pickupBtn.disabled = true; deliverBtn.disabled = true; }
+            updateDriverMapPosition();
+        }
+
+        loadAllData();
+        if (currentUser) renderMainApp();
+        else renderLogin();
+    </script>
+</body>
+</html>
