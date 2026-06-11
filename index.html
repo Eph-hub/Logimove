@@ -1,28 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>LogiMove Test</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>LogiMove Zambia - Live</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        #map { height: 300px; width: 100%; }
-        body { font-family: sans-serif; padding: 20px; }
-        pre { background: #f0f0f0; padding: 10px; overflow: auto; }
+        .map-container { height: 240px; width: 100%; border-radius: 16px; margin-bottom: 10px; }
+        .login-container { max-width: 450px; margin: auto; }
+        .saved-place-item { background: #f1f5f9; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; display: inline-block; margin: 2px; }
+        button:active { transform: scale(0.97); }
+        .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
     </style>
 </head>
-<body>
-    <h1>LogiMove - Debug Mode</h1>
-    <div id="map"></div>
-    <div id="status">Checking Firebase...</div>
-    <pre id="log"></pre>
+<body class="bg-slate-100">
+    <div id="appContainer" class="max-w-7xl mx-auto p-4">Loading...</div>
 
     <script type="module">
-        // Import Firebase
+        // ---------- FIREBASE (using your working config) ----------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB5hxpRq8WJ5f6EmNZPw-3II6910CXk4Z4",
@@ -36,40 +37,408 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        const statusDiv = document.getElementById('status');
-        const logDiv = document.getElementById('log');
-        
-        function log(msg) {
-            logDiv.innerHTML += msg + "\n";
-            console.log(msg);
+
+        // ---------- GLOBALS ----------
+        let currentUser = null;
+        let currentRole = null;
+        let tempPickup = null, tempDropoff = null;
+        let serviceType = "delivery";
+        let customerMap, driverMap;
+        let pickupMarker, dropoffMarker, driverMarker;
+        let savedPlaces = [];
+        let allRequests = [];
+        let unsubscribeRequests = null;
+        let driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null };
+        let mapSelectMode = "pickup";
+
+        // Pricing (ZMW)
+        const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
+        const CURRENCY = "K";
+        const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
+
+        function haversine(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-        
-        log("Firebase initialized");
-        
-        // Test map
-        const map = L.map('map').setView([-15.3875, 28.3228], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-        log("Map loaded");
-        
-        // Test Firebase Auth
-        onAuthStateChanged(auth, (user) => {
+
+        function autoPrice() {
+            if (!tempPickup || !tempDropoff) return;
+            const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
+            const price = RATES[serviceType].base + dist * RATES[serviceType].perKm;
+            const rounded = Math.round(price * 2) / 2;
+            const priceInput = document.getElementById('priceInput');
+            if (priceInput) priceInput.value = rounded;
+            const distSpan = document.getElementById('distanceDisplay');
+            if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
+            const autoSpan = document.getElementById('autoPriceDisplay');
+            if (autoSpan) autoSpan.innerText = `${CURRENCY}${rounded}`;
+        }
+
+        // ---------- RENDER LOGIN ----------
+        function renderLogin() {
+            document.getElementById('appContainer').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-xl w-full login-container p-6">
+                        <div class="text-center"><div class="bg-green-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"><i class="fas fa-truck-fast text-white text-3xl"></i></div>
+                        <h1 class="text-2xl font-bold mt-3">Logi<span class="text-green-600">Move</span> Zambia</h1><p class="text-sm text-slate-500">Delivery & Taxi • ZMW</p></div>
+                        <div class="mt-4 space-y-3"><input type="email" id="loginEmail" placeholder="Email" class="w-full border rounded-xl p-2"><input type="password" id="loginPassword" placeholder="Password" class="w-full border rounded-xl p-2"><button id="loginBtn" class="w-full bg-green-600 text-white py-2 rounded-xl">Login</button></div>
+                        <div class="mt-4 border-t pt-4"><div class="flex gap-2"><button id="showCustomerReg" class="flex-1 bg-green-50 text-green-600 py-1 rounded-full">➕ New Customer</button><button id="showDriverReg" class="flex-1 bg-amber-50 text-amber-600 py-1 rounded-full">🚚 New Driver</button></div>
+                        <div id="customerRegForm" class="hidden mt-2 space-y-2"><input type="text" id="custName" placeholder="Full name" class="w-full border rounded-lg p-1"><input type="email" id="custEmail" placeholder="Email" class="w-full border rounded-lg p-1"><input type="password" id="custPwd" placeholder="Password" class="w-full border rounded-lg p-1"><button id="doCustomerReg" class="bg-green-500 text-white py-1 rounded-lg">Register & Login</button></div>
+                        <div id="driverRegForm" class="hidden mt-2 space-y-2"><input type="text" id="drvName" placeholder="Full name" class="w-full border rounded-lg p-1"><input type="email" id="drvEmail" placeholder="Email" class="w-full border rounded-lg p-1"><input type="password" id="drvPwd" placeholder="Password" class="w-full border rounded-lg p-1"><button id="doDriverReg" class="bg-amber-500 text-white py-1 rounded-lg">Register & Login</button></div></div>
+                    </div>
+                </div>`;
+            // attach events
+            document.getElementById('loginBtn').onclick = async () => {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pwd = document.getElementById('loginPassword').value;
+                try {
+                    const cred = await signInWithEmailAndPassword(auth, email, pwd);
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    startApp();
+                } catch(e) { alert("Login error: " + e.message); }
+            };
+            const showCust = () => { document.getElementById('customerRegForm').classList.remove('hidden'); document.getElementById('driverRegForm').classList.add('hidden'); };
+            const showDrv = () => { document.getElementById('driverRegForm').classList.remove('hidden'); document.getElementById('customerRegForm').classList.add('hidden'); };
+            document.getElementById('showCustomerReg').onclick = showCust;
+            document.getElementById('showDriverReg').onclick = showDrv;
+            document.getElementById('doCustomerReg').onclick = async () => {
+                const name = document.getElementById('custName').value.trim();
+                const email = document.getElementById('custEmail').value.trim();
+                const pwd = document.getElementById('custPwd').value;
+                if (!name || !email || !pwd) return alert("Fill all");
+                try {
+                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+                    await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "customer", createdAt: serverTimestamp() });
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    startApp();
+                } catch(e) { alert("Reg error: " + e.message); }
+            };
+            document.getElementById('doDriverReg').onclick = async () => {
+                const name = document.getElementById('drvName').value.trim();
+                const email = document.getElementById('drvEmail').value.trim();
+                const pwd = document.getElementById('drvPwd').value;
+                if (!name || !email || !pwd) return alert("Fill all");
+                try {
+                    const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+                    await setDoc(doc(db, "users", cred.user.uid), { email, name, role: "driver", createdAt: serverTimestamp() });
+                    await setDoc(doc(db, "drivers", cred.user.uid), { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null });
+                    currentUser = cred.user;
+                    await loadUserData(currentUser.uid);
+                    startApp();
+                } catch(e) { alert("Reg error: " + e.message); }
+            };
+        }
+
+        async function loadUserData(uid) {
+            const userSnap = await getDoc(doc(db, "users", uid));
+            if (userSnap.exists()) currentRole = userSnap.data().role;
+            if (currentRole === "driver") {
+                const drvSnap = await getDoc(doc(db, "drivers", uid));
+                if (drvSnap.exists()) driverData = drvSnap.data();
+                else await setDoc(doc(db, "drivers", uid), driverData);
+            }
+            const savedSnap = await getDoc(doc(db, "savedPlaces", uid));
+            if (savedSnap.exists()) savedPlaces = savedSnap.data().places || [];
+            else savedPlaces = [];
+        }
+
+        function listenRequests() {
+            if (unsubscribeRequests) unsubscribeRequests();
+            const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
+            unsubscribeRequests = onSnapshot(q, (snap) => {
+                allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (currentRole === "customer") refreshCustomerUI();
+                else if (currentRole === "driver") refreshDriverUI();
+            });
+        }
+
+        // ---------- CUSTOMER DASHBOARD ----------
+        function renderCustomerDashboard() {
+            const container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <div class="flex justify-between"><h2 class="text-xl">👤 ${currentUser.email}</h2><button id="logoutBtn" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
+                    <div class="flex gap-2 my-3"><button id="serviceDelivery" class="px-3 py-1 rounded-full ${serviceType==='delivery'?'bg-green-600 text-white':'bg-gray-200'}">📦 Delivery</button><button id="serviceTaxi" class="px-3 py-1 rounded-full ${serviceType==='taxi'?'bg-green-600 text-white':'bg-gray-200'}">🚖 Taxi</button></div>
+                    <div class="relative"><input type="text" id="searchInput" placeholder="Search Zambia address..." class="w-full border rounded-xl p-2"><div id="searchResults" class="absolute bg-white border rounded-xl hidden z-10 w-full"></div></div>
+                    <div class="flex gap-1 my-2"><button id="setPickupSearch" class="text-xs bg-indigo-100 px-2 py-1 rounded">📍 Set as pickup</button><button id="setDropoffSearch" class="text-xs bg-emerald-100 px-2 py-1 rounded">🏁 Set as dropoff</button><button id="saveLocationBtn" class="text-xs bg-amber-100 px-2 py-1 rounded">💾 Save location</button></div>
+                    <div id="savedPlacesList" class="flex flex-wrap gap-1 my-2"></div>
+                    <div class="location-card"><div class="flex justify-between"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 px-2 rounded">Set on map</button></div><div id="pickupCoord">Not set</div><button id="clearPickup" class="text-xs text-red-500">Clear</button></div>
+                    <div class="location-card"><div class="flex justify-between"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 px-2 rounded">Set on map</button></div><div id="dropoffCoord">Not set</div><button id="clearDropoff" class="text-xs text-red-500">Clear</button></div>
+                    <div id="customerMap" class="map-container"></div>
+                    <div class="bg-green-50 p-2 rounded text-sm"><div>📏 Distance: <span id="distanceDisplay">— km</span></div><div>💰 Auto price: <span id="autoPriceDisplay">—</span></div></div>
+                    <div class="grid grid-cols-2 gap-2 mt-2"><select id="cargoSelect" class="border rounded p-1">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select><input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="border rounded p-1"><select id="paymentSelect" class="border rounded p-1 col-span-2">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+                    <button id="publishBtn" class="w-full mt-3 bg-green-600 text-white py-2 rounded-xl">Publish Request</button>
+                </div>
+                <div class="bg-white rounded-2xl shadow p-5 mt-4"><h3 class="font-bold">Your active request</h3><div id="activeCard">None</div><details><summary>Past requests</summary><div id="historyList"></div></details></div>`;
+            initCustomerMap();
+            attachCustomerEvents();
+            refreshCustomerUI();
+            renderSavedPlaces();
+            if (tempPickup && tempDropoff) autoPrice();
+        }
+
+        function initCustomerMap() {
+            if (customerMap) customerMap.remove();
+            customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
+            customerMap.on('click', (e) => {
+                if (mapSelectMode === 'pickup') { tempPickup = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
+                else if (mapSelectMode === 'dropoff') { tempDropoff = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
+            });
+            if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
+            if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
+            window.customerMap = customerMap;
+        }
+
+        function updatePickupDropoffDisplay() {
+            document.getElementById('pickupCoord').innerHTML = tempPickup ? `${tempPickup.lat.toFixed(5)}, ${tempPickup.lng.toFixed(5)}` : 'Not set';
+            document.getElementById('dropoffCoord').innerHTML = tempDropoff ? `${tempDropoff.lat.toFixed(5)}, ${tempDropoff.lng.toFixed(5)}` : 'Not set';
+            if (customerMap) {
+                if (pickupMarker) customerMap.removeLayer(pickupMarker);
+                if (dropoffMarker) customerMap.removeLayer(dropoffMarker);
+                if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap);
+                if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap);
+            }
+        }
+
+        async function renderSavedPlaces() {
+            const container = document.getElementById('savedPlacesList');
+            if (!container) return;
+            if (!savedPlaces.length) { container.innerHTML = '<span class="text-xs">No saved places</span>'; return; }
+            container.innerHTML = savedPlaces.map(p => `<div class="saved-place-item" data-lat="${p.lat}" data-lng="${p.lng}" data-name="${p.name}"><i class="fas fa-map-pin"></i> ${escapeHtml(p.name)} <i class="fas fa-trash-alt text-red-400 delete-place" data-name="${p.name}" style="cursor:pointer"></i></div>`).join('');
+            document.querySelectorAll('.saved-place-item').forEach(el => {
+                const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), name = el.dataset.name;
+                el.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-place')) return;
+                    if (mapSelectMode === 'pickup') { tempPickup = { lat, lng }; updatePickupDropoffDisplay(); autoPrice(); }
+                    else { tempDropoff = { lat, lng }; updatePickupDropoffDisplay(); autoPrice(); }
+                });
+                const del = el.querySelector('.delete-place');
+                if (del) del.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    savedPlaces = savedPlaces.filter(p => p.name !== name);
+                    await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
+                    renderSavedPlaces();
+                });
+            });
+        }
+
+        async function searchAddress(query) {
+            if (query.length < 3) return [];
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=zm`;
+            try { const res = await fetch(url); const data = await res.json(); return data.map(i => ({ lat: parseFloat(i.lat), lng: parseFloat(i.lon), display_name: i.display_name })); } catch(e) { return []; }
+        }
+
+        let lastSearchLoc = null;
+        async function attachCustomerEvents() {
+            document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerDashboard(); };
+            document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerDashboard(); };
+            document.getElementById('pickupMapMode').onclick = () => { mapSelectMode = 'pickup'; alert("Map click → PICKUP"); };
+            document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; alert("Map click → DROPOFF"); };
+            document.getElementById('clearPickup').onclick = () => { tempPickup = null; updatePickupDropoffDisplay(); autoPrice(); };
+            document.getElementById('clearDropoff').onclick = () => { tempDropoff = null; updatePickupDropoffDisplay(); autoPrice(); };
+            document.getElementById('publishBtn').onclick = async () => {
+                if (!tempPickup || !tempDropoff) { alert("Set pickup and dropoff"); return; }
+                let price = parseFloat(document.getElementById('priceInput').value);
+                if (isNaN(price)) price = autoPrice() || 0;
+                const req = {
+                    customerId: currentUser.uid, customerName: currentUser.email, type: serviceType,
+                    cargoDetail: document.getElementById('cargoSelect').value, price, paymentMethod: document.getElementById('paymentSelect').value,
+                    status: 'pending', driverId: null, driverName: null,
+                    pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
+                    dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
+                    createdAt: serverTimestamp()
+                };
+                await addDoc(collection(db, "requests"), req);
+                alert("Request published!");
+            };
+            document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
+            const searchInput = document.getElementById('searchInput'), resultsDiv = document.getElementById('searchResults');
+            let timeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(timeout);
+                const q = searchInput.value;
+                if (q.length < 3) { resultsDiv.classList.add('hidden'); return; }
+                timeout = setTimeout(async () => {
+                    const res = await searchAddress(q);
+                    if (!res.length) { resultsDiv.classList.add('hidden'); return; }
+                    resultsDiv.innerHTML = res.map(r => `<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,70)}</div>`).join('');
+                    resultsDiv.classList.remove('hidden');
+                    document.querySelectorAll('.autocomplete-item').forEach(el => {
+                        el.addEventListener('click', () => {
+                            lastSearchLoc = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng), name: el.dataset.name };
+                            searchInput.value = el.dataset.name;
+                            resultsDiv.classList.add('hidden');
+                        });
+                    });
+                }, 400);
+            });
+            document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else alert("Search first"); };
+            document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else alert("Search first"); };
+            document.getElementById('saveLocationBtn').onclick = async () => {
+                if (!lastSearchLoc) { alert("Search first"); return; }
+                const name = prompt("Save as:", "My Place");
+                if (!name) return;
+                savedPlaces.push({ name, lat: lastSearchLoc.lat, lng: lastSearchLoc.lng, address: lastSearchLoc.name });
+                await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
+                renderSavedPlaces();
+            };
+            document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
+        }
+
+        function refreshCustomerUI() {
+            const my = allRequests.filter(r => r.customerId === currentUser.uid);
+            const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
+            const cardDiv = document.getElementById('activeCard');
+            if (!active) cardDiv.innerHTML = '<p>No active request</p>';
+            else cardDiv.innerHTML = `<div class="bg-slate-100 p-2 rounded">#${active.id.substring(0,6)} ${active.type} - ${active.cargoDetail}<br/>Status: ${active.status}<br/>Price: ${CURRENCY}${active.price}<br/>Payment: ${active.paymentMethod}<br/>${active.driverName ? `Driver: ${active.driverName}` : 'Waiting...'}</div>`;
+            const past = my.filter(r => r.status === 'delivered');
+            document.getElementById('historyList').innerHTML = past.length ? past.map(r => `<div>#${r.id.substring(0,6)} ${r.type} - ${CURRENCY}${r.price}</div>`).join('') : '<div>No past trips</div>';
+            // driver location tracking (optional)
+            const activeTrip = my.find(r => r.driverId && (r.status === 'accepted' || r.status === 'pickedUp'));
+            if (activeTrip && activeTrip.driverId) {
+                if (window.driverPosUnsub) window.driverPosUnsub();
+                window.driverPosUnsub = onSnapshot(doc(db, "drivers", activeTrip.driverId), (docSnap) => {
+                    if (docSnap.exists() && window.customerMap) {
+                        const loc = docSnap.data();
+                        if (window.driverMarkerCust) window.driverMarkerCust.setLatLng([loc.currentLat, loc.currentLng]);
+                        else window.driverMarkerCust = L.marker([loc.currentLat, loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700"></i>', iconSize: [24,24] }) }).addTo(window.customerMap).bindTooltip('Driver');
+                    }
+                });
+            }
+        }
+
+        // ---------- DRIVER DASHBOARD (short and robust) ----------
+        function renderDriverDashboard() {
+            document.getElementById('appContainer').innerHTML = `
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <div class="flex justify-between"><h2 class="text-xl">🚚 Driver: ${currentUser.email}</h2><span id="driverStatusBadge" class="bg-green-100 px-2 rounded-full">online</span><button id="logoutDriver" class="bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div>
+                    <div class="grid md:grid-cols-2 gap-4 mt-4">
+                        <div><div id="driverMap" class="map-container h-48"></div><button id="gpsBtn" class="text-sm bg-slate-100 px-2 py-1 rounded">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-slate-100 px-2 py-1 rounded">🎯 Center</button></div>
+                        <div><h3 class="font-bold">Available requests</h3><div id="availableList" class="max-h-64 overflow-auto"></div></div>
+                    </div>
+                    <div class="mt-4"><h3 class="font-bold">Active trip</h3><div id="activeTripDiv"></div><div id="dropoffInfo" class="hidden mt-2 p-2 bg-emerald-50 rounded"><b>Dropoff:</b> <span id="dropoffCoordDriver"></span> <span id="distToDropoff"></span></div><div class="flex gap-2 mt-3"><button id="moveToPickup" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>📍 Move to pickup</button><button id="moveToDropoff" class="bg-blue-100 px-3 py-2 rounded disabled:opacity-40" disabled>🏁 Move to dropoff</button><button id="markPicked" class="bg-amber-100 px-3 py-2 rounded disabled:opacity-40" disabled>📦 Picked up</button><button id="markDelivered" class="bg-emerald-100 px-3 py-2 rounded disabled:opacity-40" disabled>✅ Completed</button></div></div>
+                </div>`;
+            initDriverMap();
+            attachDriverEvents();
+            refreshDriverUI();
+        }
+
+        function initDriverMap() {
+            if (driverMap) driverMap.remove();
+            driverMap = L.map('driverMap').setView([driverData.currentLat, driverData.currentLng], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(driverMap);
+            driverMarker = L.marker([driverData.currentLat, driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap);
+            window.driverMap = driverMap;
+        }
+
+        async function updateDriverLoc(lat, lng) {
+            driverData.currentLat = lat;
+            driverData.currentLng = lng;
+            await updateDoc(doc(db, "drivers", currentUser.uid), { currentLat: lat, currentLng: lng });
+            driverMarker.setLatLng([lat, lng]);
+            driverMap.setView([lat, lng], 13);
+            refreshDriverUI();
+        }
+
+        async function attachDriverEvents() {
+            document.getElementById('logoutDriver').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
+            document.getElementById('gpsBtn').onclick = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => updateDriverLoc(pos.coords.latitude, pos.coords.longitude)); };
+            document.getElementById('centerDriverMap').onclick = () => driverMap.setView([driverData.currentLat, driverData.currentLng], 14);
+            document.getElementById('moveToPickup').onclick = async () => {
+                if (driverData.activeRequestId) {
+                    const trip = allRequests.find(r => r.id === driverData.activeRequestId);
+                    if (trip) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng);
+                }
+            };
+            document.getElementById('moveToDropoff').onclick = async () => {
+                if (driverData.activeRequestId) {
+                    const trip = allRequests.find(r => r.id === driverData.activeRequestId);
+                    if (trip) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
+                }
+            };
+            document.getElementById('markPicked').onclick = async () => {
+                if (driverData.activeRequestId) {
+                    const trip = allRequests.find(r => r.id === driverData.activeRequestId);
+                    if (trip && trip.status === 'accepted') await updateDoc(doc(db, "requests", driverData.activeRequestId), { status: 'pickedUp' });
+                }
+            };
+            document.getElementById('markDelivered').onclick = async () => {
+                if (driverData.activeRequestId) {
+                    const trip = allRequests.find(r => r.id === driverData.activeRequestId);
+                    if (trip && trip.status === 'pickedUp') {
+                        await updateDoc(doc(db, "requests", driverData.activeRequestId), { status: 'delivered' });
+                        await updateDoc(doc(db, "drivers", currentUser.uid), { activeRequestId: null, status: "online" });
+                        driverData.activeRequestId = null;
+                        driverData.status = "online";
+                        refreshDriverUI();
+                    }
+                }
+            };
+        }
+
+        function refreshDriverUI() {
+            const pending = allRequests.filter(r => r.status === 'pending');
+            const availDiv = document.getElementById('availableList');
+            availDiv.innerHTML = pending.length ? pending.map(req => `
+                <div class="border p-2 rounded mb-2"><div><b>${req.type==='taxi'?'🚖 Taxi':'📦 Delivery'}</b> ${CURRENCY}${req.price}</div><div class="text-xs">${req.customerName} | ${req.cargoDetail}</div><button class="acceptReq bg-amber-500 text-white px-2 py-1 rounded text-xs mt-1" data-id="${req.id}">Accept</button></div>
+            `).join('') : '<div>No requests</div>';
+            document.querySelectorAll('.acceptReq').forEach(btn => btn.addEventListener('click', async (e) => {
+                const reqId = btn.dataset.id;
+                const req = allRequests.find(r => r.id === reqId);
+                if (req && req.status === 'pending' && driverData.status !== 'busy') {
+                    await updateDoc(doc(db, "requests", reqId), { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
+                    await updateDoc(doc(db, "drivers", currentUser.uid), { activeRequestId: reqId, status: "busy" });
+                    driverData.activeRequestId = reqId;
+                    driverData.status = "busy";
+                    refreshDriverUI();
+                } else alert("Cannot accept");
+            }));
+            const activeId = driverData.activeRequestId;
+            const tripDiv = document.getElementById('activeTripDiv');
+            if (!activeId) tripDiv.innerHTML = '<p>No active trip</p>';
+            else {
+                const trip = allRequests.find(r => r.id === activeId);
+                tripDiv.innerHTML = trip ? `<div class="bg-amber-50 p-2 rounded">Trip #${trip.id.substring(0,6)} (${trip.type}) - ${trip.cargoDetail}<br/>Price: ${CURRENCY}${trip.price}<br/>Payment: ${trip.paymentMethod}<br/>Status: ${trip.status}</div>` : '<p>Loading...</p>';
+                const dropoffDiv = document.getElementById('dropoffInfo');
+                if (trip && trip.dropoffLatLng) {
+                    dropoffDiv.classList.remove('hidden');
+                    document.getElementById('dropoffCoordDriver').innerText = `${trip.dropoffLatLng.lat.toFixed(5)}, ${trip.dropoffLatLng.lng.toFixed(5)}`;
+                    const dist = haversine(driverData.currentLat, driverData.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng);
+                    document.getElementById('distToDropoff').innerHTML = `Distance: ${dist.toFixed(2)} km`;
+                } else dropoffDiv.classList.add('hidden');
+            }
+            const movePick = document.getElementById('moveToPickup'), moveDrop = document.getElementById('moveToDropoff'), pickBtn = document.getElementById('markPicked'), delBtn = document.getElementById('markDelivered');
+            if (activeId) {
+                const trip = allRequests.find(r => r.id === activeId);
+                if (trip) { movePick.disabled = false; moveDrop.disabled = false; pickBtn.disabled = (trip.status !== 'accepted'); delBtn.disabled = (trip.status !== 'pickedUp'); }
+                else disableAll();
+            } else disableAll();
+            function disableAll() { movePick.disabled = true; moveDrop.disabled = true; pickBtn.disabled = true; delBtn.disabled = true; }
+            document.getElementById('driverStatusBadge').innerText = driverData.status;
+        }
+
+        // ---------- MAIN ENTRY ----------
+        function startApp() {
+            listenRequests();
+            if (currentRole === 'customer') renderCustomerDashboard();
+            else renderDriverDashboard();
+        }
+
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                statusDiv.innerHTML = "✅ Logged in as: " + user.email;
-                log("Auth: user logged in");
+                currentUser = user;
+                await loadUserData(user.uid);
+                startApp();
             } else {
-                statusDiv.innerHTML = "🔓 Not logged in (Firebase Auth ready)";
-                log("Auth: no user");
+                renderLogin();
             }
         });
-        
-        // Test Firestore read
-        try {
-            const testQuery = await getDocs(collection(db, "users"));
-            log("Firestore read successful. Found " + testQuery.size + " users.");
-        } catch (err) {
-            log("Firestore error: " + err.message);
-        }
     </script>
 </body>
 </html>
