@@ -14,9 +14,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // TODO: Replace with your Firebase config
+        // ========== 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG ==========
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -25,10 +25,27 @@
             messagingSenderId: "YOUR_SENDER_ID",
             appId: "YOUR_APP_ID"
         };
+        // =================================================================
+
+        // Check if config is still placeholder
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+            document.body.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center bg-red-50 p-4">
+                    <div class="bg-white rounded-2xl shadow-xl max-w-md p-6 text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
+                        <h1 class="text-xl font-bold text-red-700">Firebase Configuration Missing</h1>
+                        <p class="mt-2 text-gray-600">Please replace the <code class="bg-gray-100 px-1">firebaseConfig</code> object in the code with your own Firebase project settings.</p>
+                        <p class="mt-2 text-sm">Go to <a href="https://console.firebase.google.com" class="text-blue-600 underline">Firebase Console</a> → Project Settings → General → Your apps → SDK setup and configuration.</p>
+                    </div>
+                </div>
+            `;
+            throw new Error("Firebase config not set");
+        }
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        
         // Make auth and db available globally
         window.firebaseAuth = auth;
         window.firebaseDb = db;
@@ -50,7 +67,6 @@
         window.serverTimestamp = serverTimestamp;
     </script>
     <style>
-        /* --- Tailwind CSS utilities for custom components --- */
         .map-container { height: 240px; width: 100%; border-radius: 16px; z-index: 1; }
         .badge-status { padding: 4px 10px; border-radius: 40px; font-size: 0.7rem; font-weight: bold; }
         .login-container { max-width: 450px; }
@@ -70,7 +86,6 @@
     <div id="appContainer"></div>
     <script>
         // ---------- GLOBAL VARIABLES ----------
-        /* cSpell:ignore pickup dropoff Airtel MTN Zamtel */
         let currentUser = null;
         let currentUserRole = null;
         let currentUserDocId = null;
@@ -87,15 +102,12 @@
         let driverLocationUnsubscribe = null;
         let selectedPaymentMethod = "cash";
 
-        // --- 1. ZAMBIAN PRICING RATES (in Kwacha) ---
-        // Based on local market research, rates are approx 20-30 ZMW base + 8-12 ZMW per km.
+        // --- ZAMBIAN PRICING RATES (in Kwacha) ---
         const RATES = {
-            taxi: { base: 25, perKm: 10 },      // e.g., 25 ZMW base + 10 ZMW/km
-            delivery: { base: 30, perKm: 12 }   // e.g., 30 ZMW base + 12 ZMW/km for parcels
+            taxi: { base: 25, perKm: 10 },
+            delivery: { base: 30, perKm: 12 }
         };
-        // Currency symbol
         const CURRENCY_SYMBOL = "K";
-        // Payment methods popular in Zambia
         const PAYMENT_METHODS = [
             { id: "cash", label: "Cash on Delivery" },
             { id: "airtel", label: "Airtel Money", icon: "fas fa-mobile-alt" },
@@ -104,7 +116,6 @@
             { id: "card", label: "Credit/Debit Card", icon: "fas fa-credit-card" }
         ];
 
-        // --- Helper functions (Haversine formula, price calculation) ---
         function calculateDistance(lat1, lng1, lat2, lng2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -115,19 +126,20 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return R * c;
         }
+
         function calculatePrice(distanceKm, type) {
             const rate = RATES[type];
             if (!rate) return 5;
             let price = rate.base + (distanceKm * rate.perKm);
-            // Round to nearest 50 ngwee (0.5 ZMW) for easier cash payments
             return Math.round(price * 2) / 2;
         }
+
         function updateAutomaticPrice() {
             if (!tempPickup || !tempDropoff) return;
             const dist = calculateDistance(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
             const computed = calculatePrice(dist, serviceType);
             const priceInput = document.getElementById('priceInput');
-            if (priceInput && !priceInput.disabled) priceInput.value = computed;
+            if (priceInput) priceInput.value = computed;
             const distSpan = document.getElementById('distanceDisplay');
             if (distSpan) distSpan.innerText = dist.toFixed(2) + " km";
             const autoSpan = document.getElementById('autoPriceDisplay');
@@ -135,20 +147,20 @@
             return dist;
         }
 
-        // --- Firebase Helpers (unchanged, but crucial) ---
+        // --- Firebase Helpers ---
         async function saveUserToFirestore(user, role, name) {
             const userRef = doc(window.firebaseDb, "users", user.uid);
             await setDoc(userRef, { email: user.email, name, role, createdAt: serverTimestamp() });
             if (role === 'driver') {
                 await setDoc(doc(window.firebaseDb, "drivers", user.uid), {
-                    currentLat: -15.3875,  // Default to Lusaka, Zambia
+                    currentLat: -15.3875,
                     currentLng: 28.3228,
                     status: "online",
                     activeRequestId: null
                 });
             }
-            return userRef.id;
         }
+
         async function loadUserData(uid) {
             const userDoc = await getDoc(doc(window.firebaseDb, "users", uid));
             if (userDoc.exists()) {
@@ -165,10 +177,10 @@
                 }
                 const savedPlacesRef = doc(window.firebaseDb, "savedPlaces", uid);
                 const savedPlacesDoc = await getDoc(savedPlacesRef);
-                if (savedPlacesDoc.exists()) savedPlaces = savedPlacesDoc.data().places || [];
-                else savedPlaces = [];
+                savedPlaces = savedPlacesDoc.exists() ? savedPlacesDoc.data().places || [] : [];
             }
         }
+
         function listenRequests() {
             if (allRequestsUnsubscribe) allRequestsUnsubscribe();
             const q = query(collection(window.firebaseDb, "requests"), orderBy("createdAt", "desc"));
@@ -179,6 +191,7 @@
                 else if (currentUserRole === 'driver') refreshDriverUI();
             });
         }
+
         function listenDriverLocation(driverId) {
             if (driverLocationUnsubscribe) driverLocationUnsubscribe();
             driverLocationUnsubscribe = onSnapshot(doc(window.firebaseDb, "drivers", driverId), (docSnap) => {
@@ -194,7 +207,7 @@
             });
         }
 
-        // --- LOGIN UI (unchanged) ---
+        // --- LOGIN UI ---
         function renderLogin() {
             const container = document.getElementById('appContainer');
             container.innerHTML = `
@@ -233,7 +246,6 @@
                     </div>
                 </div>
             `;
-            // ... (event listeners remain identical to previous version)
             document.getElementById('loginBtn').onclick = () => {
                 const email = document.getElementById('loginEmail').value.trim();
                 const pwd = document.getElementById('loginPassword').value;
@@ -272,16 +284,16 @@
                 } catch(err) { alert("Registration error: " + err.message); }
             };
         }
+
         function renderMainApp() {
             if (!currentUser) { renderLogin(); return; }
             if (currentUserRole === 'customer') renderCustomerDashboard();
             else renderDriverDashboard();
         }
 
-        // --- CUSTOMER DASHBOARD (ZMW + Payment Methods) ---
+        // --- CUSTOMER DASHBOARD ---
         function renderCustomerDashboard() {
             const container = document.getElementById('appContainer');
-            // Build payment method dropdown options
             const paymentOptions = PAYMENT_METHODS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
             container.innerHTML = `
                 <div class="max-w-7xl mx-auto px-4 py-6">
@@ -327,10 +339,9 @@
             renderSavedPlaces();
             if (tempPickup && tempDropoff) updateAutomaticPrice();
         }
-        // ... (initCustomerMap, updatePickupDropoffDisplay, renderSavedPlaces, searchAddress, escapeHtml remain largely the same as the previous version, but with Zambian default map center)
+
         function initCustomerMap() {
             if (customerMap) customerMap.remove();
-            // Center on Lusaka, Zambia
             customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
             customerMap.on('click', (e) => {
@@ -341,6 +352,7 @@
             if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
             window.customerMap = customerMap;
         }
+
         function updatePickupDropoffDisplay() {
             const pickupDiv = document.getElementById('pickupCoordDisplay');
             if (pickupDiv) pickupDiv.innerHTML = tempPickup ? `${tempPickup.lat.toFixed(5)}, ${tempPickup.lng.toFixed(5)}` : 'Not set';
@@ -353,6 +365,7 @@
                 if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap);
             }
         }
+
         async function renderSavedPlaces() {
             const container = document.getElementById('savedPlacesList');
             if (!container) return;
@@ -380,12 +393,15 @@
                 });
             });
         }
+
         async function searchAddress(query) {
             if (!query.trim()) return [];
             const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&countrycodes=zm`;
             try { const res = await fetch(url); const data = await res.json(); return data.map(item => ({ lat: parseFloat(item.lat), lng: parseFloat(item.lon), display_name: item.display_name })); } catch(e) { return []; }
         }
+
         function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
         async function attachCustomerEvents() {
             document.getElementById('serviceDeliveryBtn').onclick = () => { serviceType = 'delivery'; renderMainApp(); };
             document.getElementById('serviceTaxiBtn').onclick = () => { serviceType = 'taxi'; renderMainApp(); };
@@ -411,7 +427,7 @@
                     driverName: null,
                     pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
                     dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
-                    createdAt: Timestamp.now()
+                    createdAt: serverTimestamp()
                 };
                 await addDoc(collection(window.firebaseDb, "requests"), requestData);
                 alert("Request published!");
@@ -449,6 +465,7 @@
             };
             document.addEventListener('click', (e) => { if (searchInput && !searchInput.contains(e.target) && resultsDiv && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
         }
+
         function refreshCustomerUI() {
             if (!window.allRequests) return;
             const myRequests = window.allRequests.filter(r => r.customerId === currentUser.uid);
@@ -464,7 +481,7 @@
             else if (window.driverLocationUnsubscribe) { window.driverLocationUnsubscribe(); if (window.custDriverMarker && window.customerMap) window.customerMap.removeLayer(window.custDriverMarker); }
         }
 
-        // --- DRIVER DASHBOARD (minor adjustments for ZMW) ---
+        // --- DRIVER DASHBOARD ---
         function renderDriverDashboard() {
             const container = document.getElementById('appContainer');
             container.innerHTML = `
@@ -484,6 +501,7 @@
             attachDriverEvents();
             refreshDriverUI();
         }
+
         function initDriverMap() {
             if (driverMap) driverMap.remove();
             const lat = window.driverData?.currentLat || -15.3875;
@@ -493,6 +511,7 @@
             driverMarker = L.marker([lat, lng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap);
             window.driverMap = driverMap;
         }
+
         async function updateDriverLocation(lat, lng) {
             window.driverData.currentLat = lat;
             window.driverData.currentLng = lng;
@@ -501,6 +520,7 @@
             driverMap.setView([lat, lng], 13);
             refreshDriverUI();
         }
+
         async function attachDriverEvents() {
             document.getElementById('logoutDriverBtn').onclick = async () => { await signOut(window.firebaseAuth); currentUser = null; renderLogin(); };
             document.getElementById('updateDriverGps').onclick = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => updateDriverLocation(pos.coords.latitude, pos.coords.longitude)); };
@@ -538,6 +558,7 @@
                 }
             };
         }
+
         function refreshDriverUI() {
             if (!window.allRequests) return;
             const pending = window.allRequests.filter(r => r.status === 'pending');
@@ -584,7 +605,7 @@
             if (badge) badge.innerText = window.driverData.status;
         }
 
-        // Start the app
+        // --- START APP ---
         onAuthStateChanged(window.firebaseAuth, async (user) => {
             if (user) { currentUser = user; await loadUserData(user.uid); listenRequests(); renderMainApp(); }
             else renderLogin();
