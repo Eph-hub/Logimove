@@ -7,9 +7,10 @@
 <meta name="theme-color" content="#10b981">
     <title>LogiMove Zambia - Professional Logistics</title>
     <!-- Favicon (base64 emoji fallback) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
     <!-- Tailwind + Font Awesome + Chart.js + Leaflet + SweetAlert2 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -18,14 +19,14 @@
     <style>
         /* Dark mode variables */
         :root { --bg: #f1f5f9; --card: white; --text: #0f172a; --border: #e2e8f0; }
-        body.dark { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --border: #334155; }
+        html.dark { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --border: #334155; }
         body { background-color: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
         .card-bg { background-color: var(--card); border-color: var(--border); }
         .map-container { height: 240px; width: 100%; border-radius: 16px; margin-bottom: 10px; }
         .saved-place-item { background: #f1f5f9; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; display: inline-block; margin: 2px; }
         button:active { transform: scale(0.97); }
         .location-card { background: #f8fafc; border-radius: 1rem; padding: 0.75rem; margin-bottom: 0.75rem; }
-        body.dark .location-card { background: #334155; }
+        .dark .location-card { background: #334155; }
         .star-rating { color: gray; cursor: pointer; font-size: 1.2rem; }
         .star-rating.active { color: gold; }
         /* Smooth transitions */
@@ -34,17 +35,16 @@
         /* Custom spinner */
         .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 20px auto; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => console.log('Service Worker registered', reg))
-        .catch(err => console.log('SW registration failed', err));
-    });
-  }
-</script>
     </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('Service Worker registered', reg))
+            .catch(err => console.log('SW registration failed', err));
+        });
+      }
+    </script>
 </head>
 <body class="bg-slate-100 font-sans antialiased">
     <div id="appContainer" class="max-w-7xl mx-auto p-4">Loading...</div>
@@ -83,6 +83,7 @@
         let mapSelectMode = "pickup";
         let fcmToken = null;
         let chatUnsub = null;
+        function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         // Pricing & currency
         const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
@@ -91,8 +92,8 @@
         let surgeMultiplier = 1.0; // can be dynamic later
 
         // Dark mode
-        if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
-        function toggleDarkMode() { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); }
+        if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+        function toggleDarkMode() { document.documentElement.classList.toggle('dark'); localStorage.setItem('darkMode', document.documentElement.classList.contains('dark')); }
 
         // Helpers
         function haversine(lat1, lng1, lat2, lng2) {
@@ -131,7 +132,7 @@
             } catch(e) { console.warn("FCM error", e); }
         }
         function showNotification(title, body) {
-            if (Notification.permission === 'granted') new Notification(title, { body, icon: 'https://via.placeholder.com/64?text=LM' });
+            if (Notification.permission === 'granted') new Notification(title, { body, icon: '/icon.svg' });
             else Swal.fire({ title, text: body, icon: 'info', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
         }
         onMessage(messaging, (payload) => showNotification(payload.notification.title, payload.notification.body));
@@ -290,11 +291,9 @@
                     <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold dark:text-white">👤 ${currentUser.email}</h2><div><button id="darkModeToggle2" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">🌓</button><button id="logoutBtn" class="ml-2 bg-red-100 text-red-600 px-3 py-1 rounded">Logout</button></div></div>
                     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
                         <div class="flex gap-2"><button id="serviceDelivery" class="px-3 py-1 rounded-full ${serviceType==='delivery'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button><button id="serviceTaxi" class="px-3 py-1 rounded-full ${serviceType==='taxi'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button></div>
-                        <div class="relative mt-3"><input type="text" id="searchInput" placeholder="Search Zambia address..." class="w-full border rounded-xl p-2 dark:bg-gray-700"><div id="searchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-10 w-full"></div></div>
-                        <div class="flex gap-1 my-2"><button id="setPickupSearch" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">📍 Set as pickup</button><button id="setDropoffSearch" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-2 py-1 rounded">🏁 Set as dropoff</button><button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded">💾 Save location</button></div>
                         <div id="savedPlacesList" class="flex flex-wrap gap-1 my-2"></div>
-                        <div class="location-card"><div class="flex justify-between"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 px-2 rounded">Set on map</button></div><div id="pickupCoord">Not set</div><button id="clearPickup" class="text-xs text-red-500">Clear</button></div>
-                        <div class="location-card"><div class="flex justify-between"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 px-2 rounded">Set on map</button></div><div id="dropoffCoord">Not set</div><button id="clearDropoff" class="text-xs text-red-500">Clear</button></div>
+                        <div class="location-card"><div class="flex justify-between items-center"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">Set on map</button></div><div class="relative mt-1"><input type="text" id="pickupSearch" placeholder="Search pickup location..." class="w-full border rounded-xl p-2 text-sm dark:bg-gray-700 dark:text-white"><div id="pickupSearchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-20 w-full shadow-lg max-h-48 overflow-auto"></div></div><div id="pickupCoord" class="text-xs mt-1 text-slate-500 dark:text-slate-400">Not set</div><button id="clearPickup" class="text-xs text-red-500 mt-1">Clear</button></div>
+                        <div class="location-card"><div class="flex justify-between items-center"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-2 py-1 rounded">Set on map</button></div><div class="relative mt-1"><input type="text" id="dropoffSearch" placeholder="Search dropoff location..." class="w-full border rounded-xl p-2 text-sm dark:bg-gray-700 dark:text-white"><div id="dropoffSearchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-20 w-full shadow-lg max-h-48 overflow-auto"></div></div><div id="dropoffCoord" class="text-xs mt-1 text-slate-500 dark:text-slate-400">Not set</div><button id="clearDropoff" class="text-xs text-red-500 mt-1">Clear</button></div>
                         <div id="customerMap" class="map-container"></div>
                         <div class="bg-green-50 dark:bg-green-900 p-2 rounded text-sm"><div>📏 Distance: <span id="distanceDisplay">— km</span></div><div>💰 Auto price: <span id="autoPriceDisplay">—</span></div><div id="fareBreakdown" class="text-xs"></div></div>
                         <div class="grid grid-cols-2 gap-2 mt-2"><select id="cargoSelect" class="border rounded p-1 dark:bg-gray-700">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select><input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="border rounded p-1 dark:bg-gray-700"><select id="paymentSelect" class="border rounded p-1 col-span-2 dark:bg-gray-700">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select></div>
@@ -364,14 +363,13 @@
             try { const res = await fetch(url); const data = await res.json(); return data.map(i => ({ lat: parseFloat(i.lat), lng: parseFloat(i.lon), display_name: i.display_name })); } catch(e) { return []; }
         }
 
-        let lastSearchLoc = null;
         async function attachCustomerEvents() {
             document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerDashboard(); };
             document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerDashboard(); };
-            document.getElementById('pickupMapMode').onclick = () => { mapSelectMode = 'pickup'; Swal.fire({ title: 'Pickup mode', text: 'Click on map to set pickup', icon: 'info', timer: 1500, showConfirmButton: false }); };
-            document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; Swal.fire({ title: 'Dropoff mode', text: 'Click on map to set dropoff', icon: 'info', timer: 1500, showConfirmButton: false }); };
-            document.getElementById('clearPickup').onclick = () => { tempPickup = null; updatePickupDropoffDisplay(); autoPrice(); };
-            document.getElementById('clearDropoff').onclick = () => { tempDropoff = null; updatePickupDropoffDisplay(); autoPrice(); };
+            document.getElementById('pickupMapMode').onclick = () => { mapSelectMode = 'pickup'; document.getElementById('pickupMapMode').className = 'text-xs bg-indigo-500 text-white px-2 py-1 rounded font-semibold'; document.getElementById('dropoffMapMode').className = 'text-xs bg-emerald-100 dark:bg-emerald-900 px-2 rounded'; Swal.fire({ title: 'Pickup mode', text: 'Click on map to set pickup', icon: 'info', timer: 1500, showConfirmButton: false }); };
+            document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; document.getElementById('pickupMapMode').className = 'text-xs bg-indigo-100 dark:bg-indigo-900 px-2 rounded'; document.getElementById('dropoffMapMode').className = 'text-xs bg-emerald-500 text-white px-2 py-1 rounded font-semibold'; Swal.fire({ title: 'Dropoff mode', text: 'Click on map to set dropoff', icon: 'info', timer: 1500, showConfirmButton: false }); };
+            document.getElementById('clearPickup').onclick = () => { tempPickup = null; document.getElementById('pickupSearch').value = ''; updatePickupDropoffDisplay(); autoPrice(); };
+            document.getElementById('clearDropoff').onclick = () => { tempDropoff = null; document.getElementById('dropoffSearch').value = ''; updatePickupDropoffDisplay(); autoPrice(); };
             document.getElementById('publishBtn').onclick = async () => {
                 if (!tempPickup || !tempDropoff) { Swal.fire('Error', 'Set pickup and dropoff', 'warning'); return; }
                 let price = parseFloat(document.getElementById('priceInput').value);
@@ -389,38 +387,34 @@
                 showNotification("Request Published", "Drivers can now see your request.");
             };
             document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
-            const searchInput = document.getElementById('searchInput'), resultsDiv = document.getElementById('searchResults');
-            let timeout;
-            searchInput.addEventListener('input', () => {
-                clearTimeout(timeout);
-                const q = searchInput.value;
-                if (q.length < 3) { resultsDiv.classList.add('hidden'); return; }
-                timeout = setTimeout(async () => {
-                    const res = await searchAddress(q);
-                    if (!res.length) { resultsDiv.classList.add('hidden'); return; }
-                    resultsDiv.innerHTML = res.map(r => `<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,70)}</div>`).join('');
-                    resultsDiv.classList.remove('hidden');
-                    document.querySelectorAll('.autocomplete-item').forEach(el => {
-                        el.addEventListener('click', () => {
-                            lastSearchLoc = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng), name: el.dataset.name };
-                            searchInput.value = el.dataset.name;
-                            resultsDiv.classList.add('hidden');
+            function setupLocationSearch(inputId, resultsId, setFn) {
+                const input = document.getElementById(inputId);
+                const results = document.getElementById(resultsId);
+                let timer;
+                input.addEventListener('input', () => {
+                    clearTimeout(timer);
+                    const q = input.value;
+                    if (q.length < 3) { results.classList.add('hidden'); return; }
+                    timer = setTimeout(async () => {
+                        const res = await searchAddress(q);
+                        if (!res.length) { results.classList.add('hidden'); return; }
+                        results.innerHTML = res.map(r => `<div class="loc-result p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${escapeHtml(r.display_name)}">${r.display_name.substring(0,70)}</div>`).join('');
+                        results.classList.remove('hidden');
+                        results.querySelectorAll('.loc-result').forEach(el => {
+                            el.addEventListener('click', () => {
+                                setFn({ lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) });
+                                input.value = el.dataset.name.substring(0, 70);
+                                results.classList.add('hidden');
+                                updatePickupDropoffDisplay();
+                                autoPrice();
+                            });
                         });
-                    });
-                }, 400);
-            });
-            document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
-            document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
-            document.getElementById('saveLocationBtn').onclick = async () => {
-                if (!lastSearchLoc) { Swal.fire('Search first'); return; }
-                const { value: name } = await Swal.fire({ title: 'Save place', input: 'text', inputLabel: 'Name (e.g., Home, Work)', inputValue: 'My Place', showCancelButton: true });
-                if (!name) return;
-                savedPlaces.push({ name, lat: lastSearchLoc.lat, lng: lastSearchLoc.lng, address: lastSearchLoc.name });
-                await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
-                renderSavedPlaces();
-                Swal.fire('Saved!', '', 'success');
-            };
-            document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
+                    }, 400);
+                });
+                document.addEventListener('click', (e) => { if (!input.contains(e.target) && !results.contains(e.target)) results.classList.add('hidden'); });
+            }
+            setupLocationSearch('pickupSearch', 'pickupSearchResults', (loc) => { tempPickup = loc; });
+            setupLocationSearch('dropoffSearch', 'dropoffSearchResults', (loc) => { tempDropoff = loc; });
         }
 
         function refreshCustomerUI() {
@@ -579,7 +573,7 @@
             const pending = allRequests.filter(r => r.status === 'pending');
             const availDiv = document.getElementById('availableList');
             availDiv.innerHTML = pending.length ? pending.map(req => `
-                <div class="border p-2 rounded mb-2"><div><b>${req.type==='taxi'?'🚖 Taxi':'📦 Delivery'}</b> ${CURRENCY}${req.price}</div><div class="text-xs">${req.customerName} | ${req.cargoDetail}</div><button class="acceptReq bg-amber-500 text-white px-2 py-1 rounded text-xs mt-1" data-id="${req.id}">Accept</button></div>
+                <div class="border p-2 rounded mb-2"><div><b>${req.type==='taxi'?'🚖 Taxi':'📦 Delivery'}</b> ${CURRENCY}${req.price}</div><div class="text-xs">${escapeHtml(req.customerName)} | ${escapeHtml(req.cargoDetail)}</div><button class="acceptReq bg-amber-500 text-white px-2 py-1 rounded text-xs mt-1" data-id="${req.id}">Accept</button></div>
             `).join('') : '<div>No requests</div>';
             document.querySelectorAll('.acceptReq').forEach(btn => btn.addEventListener('click', async (e) => {
                 const reqId = btn.dataset.id;
@@ -637,7 +631,7 @@
             chatUnsub = onSnapshot(q, (snap) => {
                 const messages = snap.docs.map(d => d.data());
                 const chatDiv = document.getElementById('chatMessages');
-                if (chatDiv) chatDiv.innerHTML = messages.map(m => `<div><b>${m.senderName}:</b> ${m.text}</div>`).join('');
+                if (chatDiv) chatDiv.innerHTML = messages.map(m => `<div><b>${escapeHtml(m.senderName)}:</b> ${escapeHtml(m.text)}</div>`).join('');
             });
             const sendBtn = document.getElementById('sendChat');
             const input = document.getElementById('chatInput');
