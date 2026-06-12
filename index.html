@@ -292,7 +292,7 @@
                     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
                         <div class="flex gap-2"><button id="serviceDelivery" class="px-3 py-1 rounded-full ${serviceType==='delivery'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button><button id="serviceTaxi" class="px-3 py-1 rounded-full ${serviceType==='taxi'?'bg-green-600 text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button></div>
                         <div id="savedPlacesList" class="flex flex-wrap gap-1 my-2"></div>
-                        <div class="location-card"><div class="flex justify-between items-center"><b>📍 PICKUP</b><button id="pickupMapMode" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">Set on map</button></div><div class="relative mt-1"><input type="text" id="pickupSearch" placeholder="Search pickup location..." class="w-full border rounded-xl p-2 text-sm dark:bg-gray-700 dark:text-white"><div id="pickupSearchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-20 w-full shadow-lg max-h-48 overflow-auto"></div></div><div id="pickupCoord" class="text-xs mt-1 text-slate-500 dark:text-slate-400">Not set</div><button id="clearPickup" class="text-xs text-red-500 mt-1">Clear</button></div>
+                        <div class="location-card"><div class="flex justify-between items-center"><b>📍 PICKUP</b><div class="flex gap-1 flex-wrap justify-end"><button id="useMyLocation" class="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded"><i class="fas fa-location-crosshairs"></i> My location</button><button id="pickupMapMode" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">Set on map</button></div></div><div class="relative mt-1"><input type="text" id="pickupSearch" placeholder="Search pickup location..." class="w-full border rounded-xl p-2 text-sm dark:bg-gray-700 dark:text-white"><div id="pickupSearchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-20 w-full shadow-lg max-h-48 overflow-auto"></div></div><div id="pickupCoord" class="text-xs mt-1 text-slate-500 dark:text-slate-400">Not set</div><button id="clearPickup" class="text-xs text-red-500 mt-1">Clear</button></div>
                         <div class="location-card"><div class="flex justify-between items-center"><b>🏁 DROPOFF</b><button id="dropoffMapMode" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-2 py-1 rounded">Set on map</button></div><div class="relative mt-1"><input type="text" id="dropoffSearch" placeholder="Search dropoff location..." class="w-full border rounded-xl p-2 text-sm dark:bg-gray-700 dark:text-white"><div id="dropoffSearchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-20 w-full shadow-lg max-h-48 overflow-auto"></div></div><div id="dropoffCoord" class="text-xs mt-1 text-slate-500 dark:text-slate-400">Not set</div><button id="clearDropoff" class="text-xs text-red-500 mt-1">Clear</button></div>
                         <div id="customerMap" class="map-container"></div>
                         <div class="bg-green-50 dark:bg-green-900 p-2 rounded text-sm"><div>📏 Distance: <span id="distanceDisplay">— km</span></div><div>💰 Auto price: <span id="autoPriceDisplay">—</span></div><div id="fareBreakdown" class="text-xs"></div></div>
@@ -370,6 +370,31 @@
             document.getElementById('dropoffMapMode').onclick = () => { mapSelectMode = 'dropoff'; document.getElementById('pickupMapMode').className = 'text-xs bg-indigo-100 dark:bg-indigo-900 px-2 rounded'; document.getElementById('dropoffMapMode').className = 'text-xs bg-emerald-500 text-white px-2 py-1 rounded font-semibold'; Swal.fire({ title: 'Dropoff mode', text: 'Click on map to set dropoff', icon: 'info', timer: 1500, showConfirmButton: false }); };
             document.getElementById('clearPickup').onclick = () => { tempPickup = null; document.getElementById('pickupSearch').value = ''; updatePickupDropoffDisplay(); autoPrice(); };
             document.getElementById('clearDropoff').onclick = () => { tempDropoff = null; document.getElementById('dropoffSearch').value = ''; updatePickupDropoffDisplay(); autoPrice(); };
+            document.getElementById('useMyLocation').onclick = () => {
+                if (!navigator.geolocation) { Swal.fire('Not supported', 'Geolocation is not available in this browser.', 'error'); return; }
+                const btn = document.getElementById('useMyLocation');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting...';
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    tempPickup = { lat, lng };
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                        const data = await res.json();
+                        if (data.display_name) document.getElementById('pickupSearch').value = data.display_name.substring(0, 70);
+                    } catch(e) {}
+                    updatePickupDropoffDisplay();
+                    autoPrice();
+                    if (customerMap) customerMap.setView([lat, lng], 15);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> My location';
+                }, () => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> My location';
+                    Swal.fire('Location denied', 'Please allow location access in your browser settings.', 'warning');
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            };
             document.getElementById('publishBtn').onclick = async () => {
                 if (!tempPickup || !tempDropoff) { Swal.fire('Error', 'Set pickup and dropoff', 'warning'); return; }
                 let price = parseFloat(document.getElementById('priceInput').value);
