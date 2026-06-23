@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* ----- Theme variables (unchanged) ----- */
+        /* Theme & base (same as before) */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
@@ -56,7 +56,7 @@
         .chat-message { padding: 4px 0; border-bottom: 1px solid var(--border); }
         .chat-message .time { font-size: 0.6rem; color: var(--text); opacity: 0.5; margin-left: 8px; }
 
-        /* ----- NEW: Clean location cards ----- */
+        /* Clean location cards */
         .location-card-clean {
             padding: 0.5rem 1rem;
             border-radius: 1rem;
@@ -69,14 +69,8 @@
             background: var(--bg);
             min-height: 60px;
         }
-        .location-card-clean.active-pickup {
-            border-color: #10b981;
-            background: rgba(16, 185, 129, 0.08);
-        }
-        .location-card-clean.active-dropoff {
-            border-color: #3b82f6;
-            background: rgba(59, 130, 246, 0.08);
-        }
+        .location-card-clean.active-pickup { border-color: #10b981; background: rgba(16, 185, 129, 0.08); }
+        .location-card-clean.active-dropoff { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
         .location-card-clean .icon { font-size: 1.2rem; margin-right: 0.5rem; }
         .location-card-clean .info { flex: 1; }
         .location-card-clean .label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; color: var(--text); opacity: 0.6; }
@@ -95,6 +89,17 @@
         .progress-step .dot.done { background: #10b981; }
         .progress-line { flex: 1; height: 2px; background: var(--border); }
         .progress-line.done { background: #10b981; }
+
+        /* Chat badge */
+        .chat-badge {
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            padding: 0 0.4rem;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 4px;
+        }
 
         @media (max-width: 640px) {
             .location-card-clean { flex-wrap: wrap; min-height: 50px; }
@@ -146,6 +151,8 @@
     let customerRouteLine = null;
     let driverPosUnsub = null;
     let driverMarkerCust = null;
+    let chatBadgeUnsub = null;
+    let currentChatId = null;
 
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
@@ -434,7 +441,7 @@
     }
 
     // ================================================================
-    // ============== REDESIGNED CUSTOMER MAP TAB (cleaner) ============
+    // ============== CUSTOMER MAP TAB (clean layout) ==============
     // ================================================================
     function renderCustomerMapTab(container) {
         const html = `
@@ -445,7 +452,7 @@
                     <button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button>
                 </div>
 
-                <!-- Search: "Where to?" -->
+                <!-- Search -->
                 <div class="relative">
                     <input type="text" id="searchInput" placeholder="Where to?" class="pr-10">
                     <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
@@ -515,83 +522,51 @@
             </div>`;
         container.innerHTML = html;
 
-        // --- Attach events for new layout ---
-
-        // Click on card to set active mode
+        // --- Attach events ---
+        // Click card to set active mode
         document.getElementById('pickupCard').addEventListener('click', () => setActiveMode('pickup'));
         document.getElementById('dropoffCard').addEventListener('click', () => setActiveMode('dropoff'));
 
-        // Set buttons – use search result or map click for active mode
+        // Set buttons
         document.getElementById('setPickupBtn').addEventListener('click', (e) => {
             e.stopPropagation();
-            const active = document.activeElement;
-            if (active && active.id === 'searchInput') {
-                // If search has a result, set it
-                const val = document.getElementById('searchInput').value;
-                if (val) {
-                    // We'll use the last search result
-                    if (window.lastSearchResult) {
-                        setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
-                    } else {
-                        Swal.fire('Search first', 'Type an address and select a result', 'info');
-                    }
-                } else {
-                    Swal.fire('Search first', 'Type an address and select a result', 'info');
-                }
+            if (window.lastSearchResult) {
+                setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
+            } else if (tempPickup) {
+                // already set
             } else {
-                // Use the active mode's current location (if set) or prompt to click map
-                if (mapSelectMode === 'pickup' && tempPickup) {
-                    // already set
-                } else if (mapSelectMode === 'dropoff' && tempDropoff) {
-                    // already set
-                } else {
-                    Swal.fire('Set location', 'Click the map or search for an address first', 'info');
-                }
+                Swal.fire('Search first', 'Type an address and select a result', 'info');
             }
         });
         document.getElementById('setDropoffBtn').addEventListener('click', (e) => {
             e.stopPropagation();
-            // same as above but for dropoff
-            if (document.activeElement && document.activeElement.id === 'searchInput') {
-                if (window.lastSearchResult) {
-                    setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
-                } else {
-                    Swal.fire('Search first', 'Type an address and select a result', 'info');
-                }
+            if (window.lastSearchResult) {
+                setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
+            } else if (tempDropoff) {
+                // already set
             } else {
-                if (mapSelectMode === 'dropoff' && tempDropoff) {
-                    // already set
-                } else if (mapSelectMode === 'pickup' && tempPickup) {
-                    // already set
-                } else {
-                    Swal.fire('Set location', 'Click the map or search for an address first', 'info');
-                }
+                Swal.fire('Search first', 'Type an address and select a result', 'info');
             }
         });
 
         document.getElementById('clearPickup').addEventListener('click', (e) => {
             e.stopPropagation();
-            tempPickup = null;
-            tempPickupAddress = null;
-            updateLocationUI();
-            autoPrice();
+            tempPickup = null; tempPickupAddress = null;
+            updateLocationUI(); autoPrice();
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
             drawCustomerRoute();
         });
         document.getElementById('clearDropoff').addEventListener('click', (e) => {
             e.stopPropagation();
-            tempDropoff = null;
-            tempDropoffAddress = null;
-            updateLocationUI();
-            autoPrice();
+            tempDropoff = null; tempDropoffAddress = null;
+            updateLocationUI(); autoPrice();
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
             drawCustomerRoute();
         });
         document.getElementById('clearAllBtn').addEventListener('click', () => {
             tempPickup = null; tempPickupAddress = null;
             tempDropoff = null; tempDropoffAddress = null;
-            updateLocationUI();
-            autoPrice();
+            updateLocationUI(); autoPrice();
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
             drawCustomerRoute();
@@ -633,7 +608,6 @@
         document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerTabs(); };
         document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerTabs(); };
 
-        // Publish
         document.getElementById('publishBtn').onclick = async () => {
             haptic();
             if (!tempPickup || !tempDropoff) return Swal.fire('Error', 'Please set both pickup and dropoff points', 'warning');
@@ -679,8 +653,7 @@
                 showNotification('New request', 'Drivers can see it');
                 tempPickup = null; tempPickupAddress = null;
                 tempDropoff = null; tempDropoffAddress = null;
-                updateLocationUI();
-                autoPrice();
+                updateLocationUI(); autoPrice();
                 if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
                 if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
                 drawCustomerRoute();
@@ -717,7 +690,6 @@
         });
         document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
 
-        // Render places & init map
         renderSavedPlaces();
         renderRecentPlaces();
         initCustomerMap();
@@ -725,7 +697,7 @@
         if (tempPickup && tempDropoff) autoPrice();
     }
 
-    // ---------- CORE LOCATION FUNCTIONS (same as before) ----------
+    // ---------- CORE LOCATION FUNCTIONS ----------
     function setLocationForActiveMode(latlng, address) {
         haptic();
         if (mapSelectMode === 'pickup') {
@@ -783,7 +755,6 @@
         if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
         window.customerMap = customerMap;
         drawCustomerRoute();
-        // Driver tracking
         const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
         if (activeTrip && activeTrip.driverId) {
             if (driverPosUnsub) driverPosUnsub();
@@ -864,7 +835,7 @@
 
     function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
-    // ---------- CUSTOMER ACTIVE TAB (unchanged) ----------
+    // ---------- CUSTOMER ACTIVE TAB (with chat badge) ----------
     function renderCustomerActiveTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid);
         const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
@@ -873,6 +844,7 @@
             return;
         }
         const tripDisplay = active.tripNumber ? `#${active.tripNumber}` : `#${active.id.substring(0,6)}`;
+
         let progressHtml = '';
         if (active.status === 'pending') {
             progressHtml = `<div class="progress-step"><span class="dot active"></span> Waiting for driver... <span class="progress-line"></span><span class="dot"></span> En route <span class="progress-line"></span><span class="dot"></span> Delivered</div>`;
@@ -881,6 +853,7 @@
         } else if (active.status === 'pickedUp') {
             progressHtml = `<div class="progress-step"><span class="dot done"></span> Driver assigned <span class="progress-line done"></span><span class="dot done"></span> En route <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
         }
+
         let ratingHtml = '';
         if (active.status === 'delivered' && !active.rated) {
             ratingHtml = `
@@ -897,20 +870,25 @@
                     <button id="submitRating" class="btn-primary text-xs mt-2">Submit Rating</button>
                 </div>`;
         }
+
+        // Chat with unread badge
         let chatHtml = '';
         if (active.status === 'accepted' || active.status === 'pickedUp') {
             chatHtml = `
                 <div class="mt-3 border-t pt-2">
-                    <details><summary>💬 Chat with driver</summary>
+                    <details id="chatDetails">
+                        <summary id="chatSummary">💬 Chat with driver <span id="chatBadge" class="chat-badge hidden">0</span></summary>
                         <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
                         <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
                     </details>
                 </div>`;
         }
+
         let mapHtml = '';
         if (active.pickupLatLng && active.dropoffLatLng && (active.status === 'accepted' || active.status === 'pickedUp')) {
             mapHtml = `<div class="mt-3 border-t pt-2"><div class="text-sm font-semibold">📍 Live tracking</div><div id="activeTripMiniMap" class="map-container h-40"></div></div>`;
         }
+
         container.innerHTML = `
             <div class="space-y-3">
                 <div class="flex justify-between items-center">
@@ -933,6 +911,8 @@
                 ${chatHtml}
                 ${mapHtml}
             </div>`;
+
+        // Rating logic
         if (active.status === 'delivered' && !active.rated) {
             let selectedRating = 0;
             const stars = document.querySelectorAll('.star-rating');
@@ -950,8 +930,12 @@
                 renderCustomerTabs();
             });
         }
+
+        // Chat with unread counts
         if (active.status === 'accepted' || active.status === 'pickedUp') {
-            loadChat(active.id);
+            const chatId = active.id;
+            currentChatId = chatId;
+            loadChat(chatId, true); // true = show badge
             setTimeout(() => {
                 const miniMapDiv = document.getElementById('activeTripMiniMap');
                 if (miniMapDiv) {
@@ -975,7 +959,7 @@
         }
     }
 
-    // ---------- CUSTOMER HISTORY ----------
+    // ---------- CUSTOMER HISTORY (trip numbers) ----------
     function renderCustomerHistoryTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = `<div class="text-center py-8 text-gray-400">No past trips</div>`; return; }
@@ -1011,7 +995,92 @@
         });
     }
 
-    // ========== DRIVER DASHBOARD (unchanged) ==========
+    // ---------- CHAT with notification badge ----------
+    async function loadChat(requestId, showBadge = false) {
+        if (chatUnsub) chatUnsub();
+        const chatRef = collection(db, "chats", requestId, "messages");
+        const q = query(chatRef, orderBy("timestamp"));
+        const userId = currentUser.uid;
+
+        // Get last read timestamp
+        const readRef = doc(db, "chatReads", requestId);
+        let lastRead = null;
+        try {
+            const readDoc = await getDoc(readRef);
+            if (readDoc.exists() && readDoc.data()[userId]) {
+                lastRead = readDoc.data()[userId].toDate ? readDoc.data()[userId].toDate() : new Date(readDoc.data()[userId]);
+            }
+        } catch(e) {}
+
+        chatUnsub = onSnapshot(q, (snap) => {
+            const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const chatDiv = document.getElementById('chatMessages');
+            if (chatDiv) {
+                chatDiv.innerHTML = messages.map(m =>
+                    `<div class="chat-message"><b>${m.senderName}:</b> ${m.text} <span class="time">${formatTime(m.timestamp)}</span></div>`
+                ).join('');
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }
+
+            // Update badge
+            if (showBadge && lastRead !== null) {
+                const unread = messages.filter(m => {
+                    const ts = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+                    return ts > lastRead && m.senderId !== userId;
+                });
+                const badge = document.getElementById('chatBadge');
+                if (badge) {
+                    if (unread.length > 0) {
+                        badge.innerText = unread.length;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            } else {
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            }
+        });
+
+        // When user opens chat details, mark as read
+        const details = document.getElementById('chatDetails');
+        if (details) {
+            details.addEventListener('toggle', async () => {
+                if (details.open) {
+                    // Mark all as read
+                    await setDoc(readRef, { [userId]: serverTimestamp() }, { merge: true });
+                    const badge = document.getElementById('chatBadge');
+                    if (badge) badge.classList.add('hidden');
+                }
+            });
+        }
+
+        // Send message
+        const sendBtn = document.getElementById('sendChat');
+        const input = document.getElementById('chatInput');
+        if (sendBtn && input) {
+            const newSend = async () => {
+                const text = input.value.trim();
+                if (!text) return;
+                await addDoc(collection(db, "chats", requestId, "messages"), {
+                    senderId: userId,
+                    senderName: currentUser.email,
+                    text,
+                    timestamp: serverTimestamp()
+                });
+                input.value = '';
+                // Mark as read for self
+                await setDoc(readRef, { [userId]: serverTimestamp() }, { merge: true });
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            };
+            sendBtn.onclick = newSend;
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
+        }
+    }
+
+    // ---------- DRIVER DASHBOARD (with chat badge) ----------
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         const total = completed.reduce((s, r) => s + r.price, 0);
@@ -1132,6 +1201,15 @@
         } else if (trip.status === 'pickedUp') {
             progressHtml = `<div class="progress-step"><span class="dot done"></span> Accepted <span class="progress-line done"></span><span class="dot done"></span> Picked up <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
         }
+
+        // Chat with badge
+        let chatHtml = `
+            <div class="mt-2"><details id="chatDetails">
+                <summary id="chatSummary">💬 Chat with customer <span id="chatBadge" class="chat-badge hidden">0</span></summary>
+                <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
+                <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
+            </details></div>`;
+
         container.innerHTML = `
             <div class="space-y-3">
                 <div class="flex justify-between"><span class="font-semibold">${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
@@ -1146,7 +1224,7 @@
                     <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
                     <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
                 </div>
-                <div class="mt-2"><details><summary>💬 Chat with customer</summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>
+                ${chatHtml}
             </div>`;
         document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
         document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
@@ -1166,7 +1244,10 @@
                 showNotification('Delivered', `Trip completed with ${trip.customerName}`);
             }
         };
-        loadChat(trip.id);
+        // Load chat with badge
+        if (trip.id) {
+            loadChat(trip.id, true);
+        }
     }
 
     function renderDriverHistoryTab(container) {
@@ -1184,41 +1265,7 @@
         }).join('');
     }
 
-    // ---------- CHAT ----------
-    async function loadChat(requestId) {
-        if (chatUnsub) chatUnsub();
-        const chatRef = collection(db, "chats", requestId, "messages");
-        const q = query(chatRef, orderBy("timestamp"));
-        chatUnsub = onSnapshot(q, (snap) => {
-            const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const chatDiv = document.getElementById('chatMessages');
-            if (chatDiv) {
-                chatDiv.innerHTML = messages.map(m =>
-                    `<div class="chat-message"><b>${m.senderName}:</b> ${m.text} <span class="time">${formatTime(m.timestamp)}</span></div>`
-                ).join('');
-                chatDiv.scrollTop = chatDiv.scrollHeight;
-            }
-        });
-        const sendBtn = document.getElementById('sendChat');
-        const input = document.getElementById('chatInput');
-        if (sendBtn && input) {
-            const newSend = async () => {
-                const text = input.value.trim();
-                if (!text) return;
-                await addDoc(collection(db, "chats", requestId, "messages"), {
-                    senderId: currentUser.uid,
-                    senderName: currentUser.email,
-                    text,
-                    timestamp: serverTimestamp()
-                });
-                input.value = '';
-            };
-            sendBtn.onclick = newSend;
-            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
-        }
-    }
-
-    // ---------- ADMIN PANEL ----------
+    // ---------- ADMIN ----------
     async function renderAdminPanel() {
         const usersSnap = await getDocs(collection(db, "users"));
         const driversSnap = await getDocs(collection(db, "drivers"));
