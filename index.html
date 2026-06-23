@@ -1,37 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>LogiMove-Zm – Food & Ride</title>
-    <!-- Leaflet -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>LogiMove Zambia – Ride & Food</title>
+    <!-- Leaflet etc. -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Routing Machine -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <!-- Tailwind, Font Awesome, Chart.js, SweetAlert2 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <style>
-        /* ----- Theme with high contrast (default dark) ----- */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
             --primary-dark: #4338ca;
             --primary-bg: #1e1b4b;
             --primary-hover: #4338ca;
-            --primary-ring: rgba(79, 70, 229, 0.3);
+            --primary-ring: rgba(79,70,229,0.3);
             --bg: #0f172a;
             --card: #1e293b;
             --text: #f1f5f9;
             --border: #334155;
             background: var(--bg);
             color: var(--text);
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             transition: background 0.3s, color 0.3s;
         }
         body.light {
@@ -47,9 +43,8 @@
         .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary); }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
-
         .map-container { height: 300px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
-        input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; color: var(--text); }
+        input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; color: var(--text); }
         input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
 
         .location-card-clean {
@@ -64,8 +59,8 @@
             background: var(--bg);
             min-height: 60px;
         }
-        .location-card-clean.active-pickup { border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
-        .location-card-clean.active-dropoff { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
+        .location-card-clean.active-pickup { border-color: #10b981; background: rgba(16,185,129,0.15); }
+        .location-card-clean.active-dropoff { border-color: #3b82f6; background: rgba(59,130,246,0.15); }
         .location-card-clean .icon { font-size: 1.2rem; margin-right: 0.5rem; }
         .location-card-clean .info { flex: 1; }
         .location-card-clean .label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; opacity: 0.6; }
@@ -78,27 +73,25 @@
         .saved-place-item { background: var(--primary-bg); color: var(--text); padding: 0.2rem 1rem; border-radius: 2rem; font-size: 0.8rem; cursor: pointer; display: inline-block; margin: 2px; }
         .saved-place-item:hover { background: var(--primary-light); }
 
-        .chat-badge {
-            background: #ef4444;
-            color: white;
-            border-radius: 50%;
-            padding: 0 0.4rem;
-            font-size: 0.7rem;
-            font-weight: bold;
-            margin-left: 4px;
-        }
+        .chat-badge { background: #ef4444; color: white; border-radius: 50%; padding: 0 0.4rem; font-size: 0.7rem; font-weight: bold; margin-left: 4px; }
 
-        .restaurant-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 0.75rem;
-            transition: 0.2s;
-            cursor: pointer;
-        }
+        .restaurant-card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 0.75rem; transition: 0.2s; cursor: pointer; }
         .restaurant-card:hover { transform: scale(1.02); border-color: var(--primary); }
         .menu-item { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
         .cart-item { display: flex; justify-content: space-between; padding: 0.4rem 0; }
+
+        /* New order badge */
+        .new-order-badge {
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 4px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
         @media (max-width: 640px) {
             .location-card-clean { flex-wrap: wrap; }
@@ -144,13 +137,16 @@
     let allRestaurants = [];
     let foodCart = [];
     let unsubscribeRequests = null;
+    let unsubscribeFoodOrders = null;
     let driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null, carModel: '', plate: '', phone: '' };
     let mapSelectMode = "pickup";
     let fcmToken = null;
     let chatUnsub = null;
-    let activeTab = 'map'; // customer: map, food, requests, history
+    let activeTab = 'map';
     let activeFoodRestaurant = null;
     let routingControl = null;
+    let seenRequestIds = new Set(); // to track new requests for notification
+    let newOrderCount = 0;
 
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
@@ -163,10 +159,41 @@
     function estimateTime(dist) { const min=Math.round((dist/30)*60); if(min<1) return '1 min'; if(min<60) return min+' min'; const h=Math.floor(min/60); const m=min%60; return h+'h '+m+'min'; }
     function autoPrice() { if(!tempPickup||!tempDropoff) return 0; const dist=haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng); let price=RATES[serviceType].base+dist*RATES[serviceType].perKm; const rounded=Math.round(price*2)/2; const pInput=document.getElementById('priceInput'); if(pInput) pInput.value=rounded; const dSpan=document.getElementById('distanceDisplay'); if(dSpan) dSpan.innerText=dist.toFixed(2)+' km'; const eSpan=document.getElementById('etaDisplay'); if(eSpan) eSpan.innerText=estimateTime(dist); const aSpan=document.getElementById('autoPriceDisplay'); if(aSpan) aSpan.innerText=`${CURRENCY}${rounded}`; const bSpan=document.getElementById('fareBreakdown'); if(bSpan) bSpan.innerText=`Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${rounded}`; return rounded; }
 
-    async function initNotifications(){ if(fcmToken) return; try{const p=await Notification.requestPermission(); if(p!=='granted') return; const token=await getToken(messaging,{vapidKey:VAPID_KEY}); if(token&&currentUser) await setDoc(doc(db,"fcmTokens",currentUser.uid),{token,role:currentRole},{merge:true}); fcmToken=token;}catch(e){console.warn("FCM error",e);} }
-    function showNotification(title,body){ if(Notification.permission==='granted') new Notification(title,{body}); else Swal.fire({title,text:body,icon:'info',toast:true,position:'top-end',timer:3000}); }
-    onMessage(messaging,(p)=>showNotification(p.notification.title,p.notification.body));
-    function haptic(){ if(navigator.vibrate) navigator.vibrate(10); }
+    // Sound notification using Web Audio API
+    function playNotificationSound() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.4);
+        } catch(e) { console.warn('Audio not supported'); }
+    }
+
+    function showNotification(title, body) {
+        if (Notification.permission === 'granted') new Notification(title, { body });
+        else Swal.fire({ title, text: body, icon: 'info', toast: true, position: 'top-end', timer: 4000 });
+    }
+
+    async function initNotifications() {
+        if (fcmToken) return;
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') return;
+            const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+            if (token && currentUser) await setDoc(doc(db,"fcmTokens",currentUser.uid),{token,role:currentRole},{merge:true});
+            fcmToken = token;
+        } catch(e) { console.warn("FCM error", e); }
+    }
+    onMessage(messaging, (p) => showNotification(p.notification.title, p.notification.body));
+
+    function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
 
     // ---------- RATINGS ----------
     async function rateDriver(reqId, driverId, rating, comment) {
@@ -206,15 +233,75 @@
         recentPlaces=recentSnap.exists()?recentSnap.data().places||[]:[];
     }
 
+    // ---------- REAL-TIME LISTENERS WITH NOTIFICATIONS ----------
     function listenRequests() {
         if(unsubscribeRequests) unsubscribeRequests();
         const q=query(collection(db,"requests"),orderBy("createdAt","desc"));
         unsubscribeRequests=onSnapshot(q,(snap)=>{
-            allRequests=snap.docs.map(d=>({id:d.id,...d.data()}));
-            if(currentRole==='customer') renderCustomerTabs();
-            else if(currentRole==='driver') renderDriverTabs();
-            else if(currentRole==='admin') renderAdminPanel();
+            const newDocs = snap.docChanges().filter(change => change.type === 'added');
+            // For each new request, if driver is online and it's pending, notify
+            if (currentRole === 'driver' && driverData.status === 'online') {
+                newDocs.forEach(change => {
+                    const req = { id: change.doc.id, ...change.doc.data() };
+                    if (req.status === 'pending' && !seenRequestIds.has(req.id)) {
+                        seenRequestIds.add(req.id);
+                        newOrderCount++;
+                        // Play sound and notify
+                        playNotificationSound();
+                        const type = req.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery';
+                        showNotification(`New ${type} request!`, `From ${req.customerName} • ${CURRENCY}${req.price}`);
+                        // Update badge on Available tab if visible
+                        updateNewOrderBadge();
+                    }
+                });
+            }
+            // Update all requests list
+            allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (currentRole === 'customer') renderCustomerTabs();
+            else if (currentRole === 'driver') renderDriverTabs();
+            else if (currentRole === 'admin') renderAdminPanel();
         });
+    }
+
+    // Food orders listener for drivers
+    function listenFoodOrders() {
+        if(unsubscribeFoodOrders) unsubscribeFoodOrders();
+        const q=query(collection(db,"foodOrders"),orderBy("createdAt","desc"));
+        unsubscribeFoodOrders=onSnapshot(q,(snap)=>{
+            const newDocs = snap.docChanges().filter(change => change.type === 'added');
+            if (currentRole === 'driver' && driverData.status === 'online') {
+                newDocs.forEach(change => {
+                    const order = { id: change.doc.id, ...change.doc.data() };
+                    if (order.status === 'pending' && !seenRequestIds.has(order.id)) {
+                        seenRequestIds.add(order.id);
+                        newOrderCount++;
+                        playNotificationSound();
+                        showNotification(`🍔 New food order!`, `From ${order.customerName} • ${CURRENCY}${order.total}`);
+                        updateNewOrderBadge();
+                    }
+                });
+            }
+            // We don't store food orders globally for UI, but we can update driver available list later.
+        });
+    }
+
+    function updateNewOrderBadge() {
+        const badge = document.getElementById('newOrderBadge');
+        if (badge) {
+            if (newOrderCount > 0) {
+                badge.innerText = newOrderCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    // Reset badge when driver views Available tab
+    function resetNewOrderBadge() {
+        newOrderCount = 0;
+        seenRequestIds.clear();
+        updateNewOrderBadge();
     }
 
     // ---------- THEME ----------
@@ -314,6 +401,7 @@
     // ---------- START ----------
     function startApp() {
         listenRequests();
+        if (currentRole === 'driver') listenFoodOrders();
         if(currentUser.email==='admin@logimove.com'){currentRole='admin'; renderAdminPanel();}
         else if(currentRole==='customer') renderCustomerTabs();
         else renderDriverTabs();
@@ -365,7 +453,7 @@
         else if(activeTab==='history') renderCustomerHistoryTab(content);
     }
 
-    // ----- CUSTOMER MAP TAB (rides/delivery) -----
+    // ----- CUSTOMER MAP TAB (same as before) -----
     function renderCustomerMapTab(container) {
         const html = `
             <div class="space-y-3">
@@ -414,7 +502,7 @@
                 <button id="publishBtn" class="btn-primary w-full">Request ride / delivery</button>
             </div>`;
         container.innerHTML = html;
-        // ---- attach events ----
+        // attach events (same as before)
         document.getElementById('pickupCard').addEventListener('click',()=>setActiveMode('pickup'));
         document.getElementById('dropoffCard').addEventListener('click',()=>setActiveMode('dropoff'));
         document.getElementById('setPickupBtn').addEventListener('click',(e)=>{e.stopPropagation(); if(window.lastSearchResult) setLocationForActiveMode(window.lastSearchResult,window.lastSearchResult.display_name); else Swal.fire('Search first');});
@@ -427,22 +515,19 @@
         document.getElementById('serviceDelivery').onclick=()=>{serviceType='delivery'; renderCustomerTabs();};
         document.getElementById('serviceTaxi').onclick=()=>{serviceType='taxi'; renderCustomerTabs();};
         document.getElementById('publishBtn').onclick=async()=>{haptic(); if(!tempPickup||!tempDropoff) return Swal.fire('Error','Set both pickup and dropoff','warning'); if(tempPickup.lat===tempDropoff.lat&&tempPickup.lng===tempDropoff.lng) return Swal.fire('Same location'); let price=parseFloat(document.getElementById('priceInput').value); if(isNaN(price)) price=autoPrice()||0; if(price<=0) return Swal.fire('Invalid price'); const detail=document.getElementById('cargoSelect').value; const payment=document.getElementById('paymentSelect').value; try{const counterRef=doc(db,"counters","requests"); let tripNumber=1; await runTransaction(db,async(transaction)=>{const counterDoc=await transaction.get(counterRef); if(counterDoc.exists()) tripNumber=counterDoc.data().current+1; transaction.set(counterRef,{current:tripNumber});}); const req={customerId:currentUser.uid,customerName:currentUser.email,type:serviceType,cargoDetail:detail,price,paymentMethod:payment,status:'pending',driverId:null,driverName:null,driverCar:'',driverPlate:'',pickupLatLng:{lat:tempPickup.lat,lng:tempPickup.lng},dropoffLatLng:{lat:tempDropoff.lat,lng:tempDropoff.lng},pickupAddress:tempPickupAddress||'Pickup',dropoffAddress:tempDropoffAddress||'Dropoff',createdAt:serverTimestamp(),tripNumber:tripNumber}; await addDoc(collection(db,"requests"),req); const recentLoc={lat:tempPickup.lat,lng:tempPickup.lng,address:tempPickupAddress}; recentPlaces=[recentLoc,...recentPlaces.filter(p=>p.lat!==recentLoc.lat||p.lng!==recentLoc.lng)].slice(0,5); await setDoc(doc(db,"recentPlaces",currentUser.uid),{places:recentPlaces}); Swal.fire({title:'Request sent!',icon:'success',timer:2000}); showNotification('New request','Drivers can see it'); tempPickup=null;tempPickupAddress=null;tempDropoff=null;tempDropoffAddress=null; updateLocationUI(); autoPrice(); if(pickupMarker&&window.customerMap){window.customerMap.removeLayer(pickupMarker); pickupMarker=null;} if(dropoffMarker&&window.customerMap){window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null;} drawCustomerRoute();}catch(e){Swal.fire('Error',e.message,'error');}};
-        // search
         const searchInput=document.getElementById('searchInput'), resultsDiv=document.getElementById('searchResults'); let timeout;
         searchInput.addEventListener('input',()=>{clearTimeout(timeout); const q=searchInput.value; if(q.length<3){resultsDiv.classList.add('hidden'); return;} timeout=setTimeout(async()=>{const res=await searchAddress(q); if(!res.length){resultsDiv.classList.add('hidden'); return;} resultsDiv.innerHTML=res.map(r=>`<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,60)}</div>`).join(''); resultsDiv.classList.remove('hidden'); document.querySelectorAll('.autocomplete-item').forEach(el=>{el.addEventListener('click',()=>{const lat=parseFloat(el.dataset.lat),lng=parseFloat(el.dataset.lng),name=el.dataset.name; window.lastSearchResult={lat,lng,display_name:name}; setLocationForActiveMode({lat,lng},name); searchInput.value=name; resultsDiv.classList.add('hidden');});});},400);});
         document.addEventListener('click',(e)=>{if(!searchInput.contains(e.target)&&!resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden');});
         renderSavedPlaces(); renderRecentPlaces(); initCustomerMap(); updateLocationUI(); if(tempPickup&&tempDropoff) autoPrice();
     }
 
-    // ----- CUSTOMER FOOD TAB -----
+    // ----- CUSTOMER FOOD TAB (same as before) -----
     function renderCustomerFoodTab(container) {
-        // Load restaurants from Firestore or seed default
         const loadRestaurants = async () => {
             const snap = await getDocs(collection(db, "restaurants"));
             if (!snap.empty) {
                 allRestaurants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             } else {
-                // Seed default restaurants
                 const defaultRestaurants = [
                     { name: "KFC", logo: "🍗", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Zinger Burger", price:35},{name:"Fries", price:15},{name:"Coke", price:8}] },
                     { name: "Hungry Lion", logo: "🐔", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Chicken Meal", price:40},{name:"Chips", price:12},{name:"Milkshake", price:18}] },
@@ -474,14 +559,12 @@
                     <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">Checkout (ZMW)</button>
                 </div>
             `;
-            // Attach view menu
             document.querySelectorAll('.view-menu-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const card = e.target.closest('.restaurant-card');
                     const name = card.querySelector('.font-bold').innerText;
                     const restaurant = allRestaurants.find(r => r.name === name);
                     if (!restaurant) return;
-                    // Show menu in modal
                     let menuHtml = restaurant.items.map(item => `
                         <div class="menu-item"><span>${item.name}</span><span>${CURRENCY}${item.price} <button class="add-to-cart-btn bg-primary text-white text-xs px-2 py-0.5 rounded-full" data-restaurant="${restaurant.name}" data-name="${item.name}" data-price="${item.price}">+</button></span></div>
                     `).join('');
@@ -509,7 +592,6 @@
             updateCartUI();
             document.getElementById('checkoutFoodBtn').addEventListener('click', async () => {
                 if (foodCart.length === 0) return Swal.fire('Cart empty');
-                // Get current location from tempPickup or ask
                 let deliveryAddr = tempPickupAddress || 'Not set';
                 if (!tempPickup) {
                     const { value: addr } = await Swal.fire({ title: 'Delivery address', input: 'text', inputLabel: 'Enter address', inputValue: deliveryAddr });
@@ -612,7 +694,6 @@
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                     L.marker([active.pickupLatLng.lat,active.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
                     L.marker([active.dropoffLatLng.lat,active.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
-                    // route with routing machine
                     L.Routing.control({
                         waypoints: [L.latLng(active.pickupLatLng.lat,active.pickupLatLng.lng), L.latLng(active.dropoffLatLng.lat,active.dropoffLatLng.lng)],
                         routeWhileDragging: false,
@@ -642,9 +723,7 @@
 
     // ----- CUSTOMER HISTORY (with food orders) -----
     function renderCustomerHistoryTab(container) {
-        // Show both ride/delivery and food orders
         const rideHistory = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
-        // also fetch food orders from Firestore
         const getFoodOrders = async () => {
             const snap = await getDocs(query(collection(db,"foodOrders"), where("customerId","==",currentUser.uid), orderBy("createdAt","desc")));
             const foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -652,7 +731,6 @@
             if (rideHistory.length === 0 && foodOrders.length === 0) {
                 html = `<div class="text-center py-8 text-gray-400">No past trips or food orders</div>`;
             } else {
-                // Ride history
                 if (rideHistory.length) {
                     html += `<h4 class="font-semibold mt-2">🚗 Rides & Deliveries</h4>`;
                     html += rideHistory.map(r => {
@@ -660,7 +738,6 @@
                         return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center"><div><span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}<br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span></div><button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button></div>`;
                     }).join('');
                 }
-                // Food orders
                 if (foodOrders.length) {
                     html += `<h4 class="font-semibold mt-2">🍔 Food Orders</h4>`;
                     html += foodOrders.map(o => `<div class="border-b border-gray-100 dark:border-gray-700 py-2"><span class="font-medium">Order #${o.id.substring(0,6)}</span> – ${CURRENCY}${o.total}<br><span class="text-xs text-gray-400">📅 ${formatDate(o.createdAt)}</span></div>`).join('');
@@ -680,7 +757,7 @@
     }
 
     // ============================================================
-    // =============== DRIVER DASHBOARD ============================
+    // =============== DRIVER DASHBOARD (enhanced notifications) ===
     // ============================================================
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
@@ -698,14 +775,20 @@
                 <div class="flex items-center gap-2 text-sm mb-3"><span>⭐ Rating: ${driverData.averageRating?.toFixed(1) || 'N/A'}</span><span class="bg-green-100 dark:bg-green-900 px-3 py-0.5 rounded-full">${driverData.status}</span></div>
                 <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='map'?'tab-active':''}" data-tab="map">🗺️ Map</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Available</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Available <span id="newOrderBadge" class="new-order-badge hidden">0</span></button>
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 Active</button>
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
                 </div>
                 <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
         document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
-        document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{ activeTab=btn.dataset.tab; renderDriverTabs(); }));
+        document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
+            activeTab=btn.dataset.tab;
+            if (activeTab === 'requests') {
+                resetNewOrderBadge(); // clear badge when viewing available
+            }
+            renderDriverTabs();
+        }));
         document.getElementById('logoutDriver').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderDriverTabs();};
@@ -714,6 +797,7 @@
         else if(activeTab==='requests') renderDriverAvailableTab(content);
         else if(activeTab==='active') renderDriverActiveTab(content);
         else if(activeTab==='history') renderDriverHistoryTab(content);
+        updateNewOrderBadge();
     }
 
     function renderDriverMapTab(container) {
@@ -735,7 +819,6 @@
             if(trip && trip.pickupLatLng && trip.dropoffLatLng){
                 L.marker([trip.pickupLatLng.lat,trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
                 L.marker([trip.dropoffLatLng.lat,trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
-                // routing
                 L.Routing.control({
                     waypoints: [L.latLng(driverData.currentLat,driverData.currentLng), L.latLng(trip.dropoffLatLng.lat,trip.dropoffLatLng.lng)],
                     routeWhileDragging: false,
@@ -755,36 +838,60 @@
         renderDriverTabs();
     }
 
+    // ----- DRIVER AVAILABLE TAB (now includes food orders too) -----
     function renderDriverAvailableTab(container) {
-        const pending = allRequests.filter(r => r.status === 'pending');
-        if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No requests available</div>'; return; }
-        container.innerHTML = pending.map(req => {
-            const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
-            return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
-                <div><span class="font-medium">${tripDisplay} (${req.type})</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
-                <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}">Accept</button>
-            </div>`;
-        }).join('');
-        document.querySelectorAll('.acceptReq').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const req = allRequests.find(r => r.id === btn.dataset.id);
-                if (req && req.status === 'pending' && driverData.status !== 'busy') {
-                    const driverSnap = await getDoc(doc(db,"drivers",currentUser.uid));
-                    const drv = driverSnap.data() || {};
-                    await updateDoc(doc(db,"requests",req.id), {
-                        status: 'accepted',
-                        driverId: currentUser.uid,
-                        driverName: currentUser.email,
-                        driverCar: drv.carModel || '',
-                        driverPlate: drv.plate || ''
+        // Get food orders that are pending
+        const getFoodOrders = async () => {
+            const snap = await getDocs(query(collection(db,"foodOrders"), where("status","==","pending")));
+            const foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Combine with ride/delivery requests
+            const pendingRides = allRequests.filter(r => r.status === 'pending');
+            let combined = [...pendingRides.map(r => ({ ...r, type: r.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery', isFood: false }))];
+            combined = [...combined, ...foodOrders.map(o => ({ id: o.id, customerName: o.customerName, type: '🍔 Food Order', cargoDetail: o.items.map(i=>`${i.name}×${i.qty}`).join(', '), price: o.total, status: 'pending', isFood: true, createdAt: o.createdAt, foodOrder: true }))];
+            if (combined.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400">No available requests</div>';
+            } else {
+                container.innerHTML = combined.map(req => {
+                    const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
+                    return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
+                        <div><span class="font-medium">${tripDisplay} ${req.type}</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
+                        <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}" data-food="${req.foodOrder||false}">Accept</button>
+                    </div>`;
+                }).join('');
+                document.querySelectorAll('.acceptReq').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        const isFood = btn.dataset.food === 'true';
+                        if (isFood) {
+                            // Accept food order
+                            await updateDoc(doc(db,"foodOrders", id), { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
+                            showNotification('Food order accepted', 'You will deliver this order.');
+                            renderDriverTabs();
+                        } else {
+                            const req = allRequests.find(r => r.id === id);
+                            if (req && req.status === 'pending' && driverData.status !== 'busy') {
+                                const driverSnap = await getDoc(doc(db,"drivers",currentUser.uid));
+                                const drv = driverSnap.data() || {};
+                                await updateDoc(doc(db,"requests", req.id), {
+                                    status: 'accepted',
+                                    driverId: currentUser.uid,
+                                    driverName: currentUser.email,
+                                    driverCar: drv.carModel || '',
+                                    driverPlate: drv.plate || ''
+                                });
+                                await updateDoc(doc(db,"drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
+                                driverData.activeRequestId = req.id; driverData.status = "busy";
+                                renderDriverTabs();
+                                showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
+                            } else Swal.fire('Cannot accept', 'Busy or taken', 'warning');
+                        }
                     });
-                    await updateDoc(doc(db,"drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
-                    driverData.activeRequestId = req.id; driverData.status = "busy";
-                    renderDriverTabs();
-                    showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
-                } else Swal.fire('Cannot accept', 'Busy or taken', 'warning');
-            });
-        });
+                });
+            }
+        };
+        getFoodOrders();
+        // Reset new order badge when viewing available
+        resetNewOrderBadge();
     }
 
     function renderDriverActiveTab(container) {
@@ -895,7 +1002,7 @@
         }
     }
 
-    // ---------- CORE LOCATION FUNCTIONS ----------
+    // ---------- CORE LOCATION FUNCTIONS (unchanged) ----------
     function setLocationForActiveMode(latlng, address) {
         haptic();
         if (mapSelectMode === 'pickup') { tempPickup = latlng; tempPickupAddress = address || '📍 Point'; }
@@ -946,7 +1053,6 @@
         if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat,tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
         window.customerMap = customerMap;
         drawCustomerRoute();
-        // If both points set, show routing
         if (tempPickup && tempDropoff) {
             L.Routing.control({
                 waypoints: [L.latLng(tempPickup.lat,tempPickup.lng), L.latLng(tempDropoff.lat,tempDropoff.lng)],
@@ -956,7 +1062,6 @@
                 createMarker: function() { return null; }
             }).addTo(customerMap);
         }
-        // driver tracking
         const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
         if (activeTrip && activeTrip.driverId) {
             if (driverPosUnsub) driverPosUnsub();
@@ -1028,7 +1133,7 @@
 
     function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
-    // ---------- ADMIN PANEL ----------
+    // ---------- ADMIN ----------
     async function renderAdminPanel() {
         const usersSnap=await getDocs(collection(db,"users"));
         const driversSnap=await getDocs(collection(db,"drivers"));
