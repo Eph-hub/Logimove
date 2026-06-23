@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>YP4f1n – Zambia Logistics</title>
-    <!-- Favicon (emoji) -->
+    <title>LogiMove Zambia</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -13,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* ----- Theme variables (unchanged) ----- */
+        /* ----- Theme variables ----- */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
@@ -60,6 +59,7 @@
         .theme-dot.active { border-color: var(--text); }
         body.dark input, body.dark select { background: #334155; border-color: #475569; color: white; }
         .chat-message { padding: 4px 0; border-bottom: 1px solid var(--border); }
+        .map-tooltip { background: var(--card); color: var(--text); border: 1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -100,6 +100,9 @@
     let fcmToken = null;
     let chatUnsub = null;
     let activeTab = 'map';
+    // Route polyline references
+    let customerRouteLine = null;
+    let driverRouteLine = null;
 
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
@@ -223,6 +226,7 @@
             d.classList.toggle('active', d.dataset.theme === themeName);
         });
     }
+    // Apply initially
     applyTheme(currentTheme);
 
     // ---------- LOGIN ----------
@@ -233,7 +237,7 @@
                     <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style="background:var(--primary-bg);">
                         <i class="fas fa-truck-fast text-4xl" style="color:var(--primary);"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">YP<span style="color:var(--primary);">4f1n</span></h1>
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Move</span></h1>
                     <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Delivery & Taxi</p>
                     <input type="email" id="loginEmail" placeholder="Email" class="mb-3">
                     <input type="password" id="loginPassword" placeholder="Password" class="mb-3">
@@ -362,6 +366,7 @@
         else if (activeTab === 'history') renderCustomerHistoryTab(content);
     }
 
+    // ---------- CUSTOMER MAP TAB (with route) ----------
     function renderCustomerMapTab(container) {
         const html = `
             <div class="space-y-4">
@@ -429,6 +434,38 @@
         if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
         if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
         window.customerMap = customerMap;
+        // Draw route if both points exist
+        drawCustomerRoute();
+        // Listen for active trip driver location
+        const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
+        if (activeTrip && activeTrip.driverId) {
+            if (window.driverPosUnsub) window.driverPosUnsub();
+            window.driverPosUnsub = onSnapshot(doc(db, "drivers", activeTrip.driverId), (docSnap) => {
+                if (docSnap.exists() && window.customerMap) {
+                    const loc = docSnap.data();
+                    if (window.driverMarkerCust) window.driverMarkerCust.setLatLng([loc.currentLat, loc.currentLng]);
+                    else {
+                        window.driverMarkerCust = L.marker([loc.currentLat, loc.currentLng], {
+                            icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700 text-2xl"></i>', iconSize: [24,24] })
+                        }).addTo(window.customerMap).bindTooltip(`Driver: ${activeTrip.driverName || 'Driver'}`);
+                    }
+                }
+            });
+        }
+    }
+
+    function drawCustomerRoute() {
+        if (customerRouteLine && window.customerMap) {
+            window.customerMap.removeLayer(customerRouteLine);
+            customerRouteLine = null;
+        }
+        if (tempPickup && tempDropoff && window.customerMap) {
+            customerRouteLine = L.polyline([[tempPickup.lat, tempPickup.lng], [tempDropoff.lat, tempDropoff.lng]], {
+                color: 'var(--primary)',
+                weight: 3,
+                dashArray: '5, 10'
+            }).addTo(window.customerMap);
+        }
     }
 
     function updatePickupDropoffDisplay() {
@@ -439,6 +476,7 @@
             if (dropoffMarker) customerMap.removeLayer(dropoffMarker);
             if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap);
             if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap);
+            drawCustomerRoute();
         }
     }
 
@@ -537,7 +575,7 @@
         document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
     }
 
-    // Customer Active Tab (shows driver details + chat)
+    // Customer Active Tab (shows driver details + chat + map with route)
     function renderCustomerActiveTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid);
         const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
@@ -559,6 +597,15 @@
                     </details>
                 </div>`;
         }
+        // Mini map showing route and driver location
+        let mapHtml = '';
+        if (active.pickupLatLng && active.dropoffLatLng && (active.status === 'accepted' || active.status === 'pickedUp')) {
+            mapHtml = `
+                <div class="mt-3 border-t pt-2">
+                    <div class="text-sm font-semibold">📍 Live tracking</div>
+                    <div id="activeTripMiniMap" class="map-container h-40"></div>
+                </div>`;
+        }
         container.innerHTML = `
             <div class="space-y-2">
                 <div class="flex justify-between"><span class="font-semibold">Trip #${active.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
@@ -573,6 +620,7 @@
                 ` : '<div class="text-gray-400">Waiting for a driver...</div>'}
                 ${ratingHtml}
                 ${chatHtml}
+                ${mapHtml}
             </div>`;
         if (active.status === 'delivered' && !active.rated) {
             const stars = document.querySelectorAll('.star-rating');
@@ -588,9 +636,33 @@
                 renderCustomerTabs();
             };
         }
-        // Chat setup if active
         if (active.status === 'accepted' || active.status === 'pickedUp') {
             loadChat(active.id);
+            // Mini map for tracking
+            setTimeout(() => {
+                const miniMapDiv = document.getElementById('activeTripMiniMap');
+                if (miniMapDiv) {
+                    const miniMap = L.map('activeTripMiniMap').setView([active.pickupLatLng.lat, active.pickupLatLng.lng], 12);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+                    L.marker([active.pickupLatLng.lat, active.pickupLatLng.lng]).addTo(miniMap).bindTooltip('Pickup');
+                    L.marker([active.dropoffLatLng.lat, active.dropoffLatLng.lng]).addTo(miniMap).bindTooltip('Dropoff');
+                    L.polyline([[active.pickupLatLng.lat, active.pickupLatLng.lng], [active.dropoffLatLng.lat, active.dropoffLatLng.lng]], {color: 'var(--primary)', weight: 2}).addTo(miniMap);
+                    // Show driver location if driverId
+                    if (active.driverId) {
+                        const driverRef = doc(db, "drivers", active.driverId);
+                        const unsub = onSnapshot(driverRef, (snap) => {
+                            if (snap.exists()) {
+                                const loc = snap.data();
+                                const marker = L.marker([loc.currentLat, loc.currentLng], {
+                                    icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] })
+                                }).addTo(miniMap).bindTooltip('Driver');
+                                miniMap.setView([loc.currentLat, loc.currentLng], 13);
+                                if (unsub) unsub();
+                            }
+                        });
+                    }
+                }
+            }, 200);
         }
     }
 
@@ -619,7 +691,7 @@
                             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                             L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
                             L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
-                            L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {color: 'var(--primary)'}).addTo(map);
+                            L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {color: 'var(--primary)', weight: 2}).addTo(map);
                         }
                     });
                 }
@@ -683,15 +755,45 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(driverMap);
-        driverMarker = L.marker([driverData.currentLat, driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap);
+        driverMarker = L.marker([driverData.currentLat, driverData.currentLng], {
+            icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] })
+        }).addTo(driverMap).bindTooltip('You');
         window.driverMap = driverMap;
+        // Show active trip pickup/dropoff and route
+        const activeId = driverData.activeRequestId;
+        if (activeId) {
+            const trip = allRequests.find(r => r.id === activeId);
+            if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
+                L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
+                L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
+                L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {
+                    color: 'var(--primary)',
+                    weight: 2,
+                    dashArray: '5, 10'
+                }).addTo(driverMap);
+                // Draw route from current location to pickup if not yet picked up
+                if (trip.status === 'accepted') {
+                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.pickupLatLng.lat, trip.pickupLatLng.lng]], {
+                        color: '#f59e0b',
+                        weight: 2,
+                        dashArray: '4, 8'
+                    }).addTo(driverMap);
+                } else if (trip.status === 'pickedUp') {
+                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {
+                        color: '#10b981',
+                        weight: 2,
+                        dashArray: '4, 8'
+                    }).addTo(driverMap);
+                }
+            }
+        }
     }
 
     async function updateDriverLoc(lat, lng) {
         driverData.currentLat = lat; driverData.currentLng = lng;
         await updateDoc(doc(db, "drivers", currentUser.uid), { currentLat: lat, currentLng: lng });
         driverMarker.setLatLng([lat, lng]); driverMap.setView([lat, lng], 13);
-        renderDriverTabs();
+        renderDriverTabs(); // refresh map
     }
 
     function renderDriverAvailableTab(container) {
@@ -769,7 +871,6 @@
                 showNotification('Delivered', `Trip completed with ${trip.customerName}`);
             }
         };
-        // Chat
         loadChat(trip.id);
     }
 
@@ -787,7 +888,7 @@
         `).join('');
     }
 
-    // ---------- CHAT FUNCTION ----------
+    // ---------- CHAT ----------
     async function loadChat(requestId) {
         if (chatUnsub) chatUnsub();
         const chatRef = collection(db, "chats", requestId, "messages");
@@ -803,7 +904,6 @@
         const sendBtn = document.getElementById('sendChat');
         const input = document.getElementById('chatInput');
         if (sendBtn && input) {
-            // Remove old listeners to avoid duplicates
             const newSend = async () => {
                 const text = input.value.trim();
                 if (!text) return;
@@ -858,7 +958,7 @@
             const rows = allRequests.map(r => [r.id, r.type, r.status, r.price, r.customerName, r.driverName||'', r.driverCar||'', r.driverPlate||'', r.paymentMethod, r.createdAt?.toDate?.()?.toISOString()||'']);
             const csv = [headers, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
             const blob = new Blob([csv], {type: 'text/csv'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'yp4f1n_requests.csv'; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'logimove_requests.csv'; a.click();
             Swal.fire('Exported!');
         };
         const userMgmt = document.getElementById('userManagementList');
