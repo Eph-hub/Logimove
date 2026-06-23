@@ -12,9 +12,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* ----- CSS Variables for theming ----- */
+        /* ----- Theme variables ----- */
         body {
-            --primary: #4f46e5;          /* Indigo default */
+            --primary: #4f46e5;
             --primary-light: #818cf8;
             --primary-dark: #4338ca;
             --primary-bg: #eef2ff;
@@ -40,27 +40,23 @@
         .btn-primary { background: var(--primary); color: white; padding: 0.6rem 1.5rem; border-radius: 2rem; font-weight: 600; transition: background 0.2s; }
         .btn-primary:hover { background: var(--primary-hover); }
         .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary); }
-        .bg-primary { background: var(--primary); }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
-        .border-primary { border-color: var(--primary); }
         .ring-primary:focus { box-shadow: 0 0 0 3px var(--primary-ring); }
+        .star-rating { color: #d1d5db; cursor: pointer; font-size: 1.4rem; transition: color 0.2s; }
         .star-rating.active { color: #f59e0b; }
-        .saved-place-item { background: var(--primary-bg); color: var(--text); }
+        .saved-place-item { background: var(--primary-bg); color: var(--text); padding: 0.2rem 1rem; border-radius: 2rem; font-size: 0.8rem; cursor: pointer; display: inline-block; margin: 2px; }
         .saved-place-item:hover { background: var(--primary-light); }
-        .spinner { border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 2rem auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .map-container { height: 260px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
         input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; }
         input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
         .fade-in { animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Theme selector button */
+        .spinner { border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 2rem auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .theme-dot { width: 24px; height: 24px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; }
         .theme-dot:hover { border-color: var(--primary); }
         .theme-dot.active { border-color: var(--text); }
-        /* Dark mode overrides (already handled with variables) */
-        body.dark .saved-place-item { background: var(--primary-bg); color: var(--text); }
         body.dark input, body.dark select { background: #334155; border-color: #475569; color: white; }
     </style>
 </head>
@@ -68,7 +64,7 @@
 <div id="appContainer" class="max-w-6xl mx-auto p-4 md:p-6"></div>
 
 <script type="module">
-    // ---------- FIREBASE IMPORTS (unchanged) ----------
+    // ---------- FIREBASE IMPORTS ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -213,12 +209,10 @@
         document.documentElement.style.setProperty('--primary-ring', theme.primary + '40');
         localStorage.setItem('theme', themeName);
         currentTheme = themeName;
-        // Update UI if theme selector is visible
         document.querySelectorAll('.theme-dot').forEach(d => {
             d.classList.toggle('active', d.dataset.theme === themeName);
         });
     }
-    // Initial apply
     applyTheme(currentTheme);
 
     // ---------- LOGIN ----------
@@ -265,7 +259,6 @@
                     </div>
                 </div>
             </div>`;
-        // Attach events
         document.getElementById('loginBtn').onclick = async () => {
             try {
                 const cred = await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value.trim(), document.getElementById('loginPassword').value);
@@ -298,7 +291,6 @@
             } catch(e) { Swal.fire('Error', e.message, 'error'); }
         };
         document.getElementById('darkToggle').onclick = toggleDark;
-        // Theme dots
         document.querySelectorAll('.theme-dot').forEach(dot => {
             dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
         });
@@ -314,7 +306,7 @@
         else renderDriverTabs();
     }
 
-    // ---------- COMMON HEADER (with theme switcher) ----------
+    // ---------- COMMON HEADER ----------
     function renderHeader(title, logoutId) {
         return `
             <div class="flex justify-between items-center mb-4">
@@ -338,13 +330,12 @@
             <div class="fade-in">
                 ${renderHeader(`👤 ${currentUser.email}`, 'logoutBtn')}
                 <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4">
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='map'?'tab-active':''}" data-tab="map">📍 Map</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Active</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='map'?'tab-active':''}" data-tab="map">📍 Where to?</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 My trip</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 Past trips</button>
                 </div>
                 <div id="tabContent" class="card p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        // Theme dots in header
         document.querySelectorAll('.theme-dot').forEach(dot => {
             dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
         });
@@ -364,31 +355,65 @@
     function renderCustomerMapTab(container) {
         const html = `
             <div class="space-y-4">
-                <div class="flex gap-2 flex-wrap"><button id="serviceDelivery" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='delivery'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button><button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button></div>
-                <div class="relative"><input type="text" id="searchInput" placeholder="Search Zambia address..." class="pr-10"><i class="fas fa-search absolute right-3 top-3 text-gray-400"></i><div id="searchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-10 w-full"></div></div>
-                <div class="flex flex-wrap gap-2"><button id="setPickupSearch" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 Set as pickup</button><button id="setDropoffSearch" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🏁 Set as dropoff</button><button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 Use My Location</button><button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button></div>
+                <div class="flex gap-2 flex-wrap">
+                    <button id="serviceDelivery" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='delivery'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button>
+                    <button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button>
+                </div>
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="Search for a place..." class="pr-10">
+                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                    <div id="searchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-10 w-full max-h-48 overflow-auto"></div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="setPickupSearch" class="text-xs bg-indigo-100 dark:bg-indigo-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 Set as pickup</button>
+                    <button id="setDropoffSearch" class="text-xs bg-emerald-100 dark:bg-emerald-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🏁 Set as dropoff</button>
+                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 Use my current location</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save this place</button>
+                </div>
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
-                <div class="grid grid-cols-2 gap-2"><div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-xl"><span class="text-xs text-gray-500">Pickup</span><div id="pickupCoord" class="text-sm font-medium">Not set</div><button id="clearPickup" class="text-xs text-red-500">Clear</button></div><div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-xl"><span class="text-xs text-gray-500">Dropoff</span><div id="dropoffCoord" class="text-sm font-medium">Not set</div><button id="clearDropoff" class="text-xs text-red-500">Clear</button></div></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-xl cursor-pointer" id="pickupBox">
+                        <span class="text-xs text-gray-500">Pickup</span>
+                        <div id="pickupCoord" class="text-sm font-medium">Not set</div>
+                        <button id="clearPickup" class="text-xs text-red-500">Clear</button>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-xl cursor-pointer" id="dropoffBox">
+                        <span class="text-xs text-gray-500">Dropoff</span>
+                        <div id="dropoffCoord" class="text-sm font-medium">Not set</div>
+                        <button id="clearDropoff" class="text-xs text-red-500">Clear</button>
+                    </div>
+                </div>
                 <div id="customerMap" class="map-container"></div>
-                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);"><div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div><div class="flex justify-between"><span>💰 Auto price</span><span id="autoPriceDisplay">—</span></div><div id="fareBreakdown" class="text-xs text-gray-500 dark:text-gray-300"></div></div>
-                <div class="grid grid-cols-2 gap-2"><select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select><input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm"></div>
+                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
+                    <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
+                    <div class="flex justify-between"><span>💰 Price estimate</span><span id="autoPriceDisplay">—</span></div>
+                    <div id="fareBreakdown" class="text-xs text-gray-500 dark:text-gray-300"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select>
+                    <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
+                </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full">Publish Request</button>
-                <div class="text-xs text-gray-400 text-center">Click on map after choosing "Set on map" mode</div>
+                <button id="publishBtn" class="btn-primary w-full">Request a ride / delivery</button>
+                <div class="text-xs text-gray-400 text-center">Click the map after selecting pickup or dropoff mode</div>
             </div>`;
         container.innerHTML = html;
         initCustomerMap();
         attachCustomerMapEvents();
         renderSavedPlaces();
         if (tempPickup && tempDropoff) autoPrice();
-        document.getElementById('pickupCoord').addEventListener('click', () => { mapSelectMode = 'pickup'; Swal.fire('Pickup mode','Click map','info'); });
-        document.getElementById('dropoffCoord').addEventListener('click', () => { mapSelectMode = 'dropoff'; Swal.fire('Dropoff mode','Click map','info'); });
+        // Click on location boxes to change mode
+        document.getElementById('pickupBox').addEventListener('click', () => { mapSelectMode = 'pickup'; Swal.fire('Pickup mode','Click on the map to set your pickup point','info'); });
+        document.getElementById('dropoffBox').addEventListener('click', () => { mapSelectMode = 'dropoff'; Swal.fire('Dropoff mode','Click on the map to set your destination','info'); });
     }
 
     function initCustomerMap() {
         if (customerMap) customerMap.remove();
         customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
+        // ========== NEW TILE LAYER WITH LABELS ==========
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(customerMap);
         customerMap.on('click', (e) => {
             if (mapSelectMode === 'pickup') { tempPickup = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
             else if (mapSelectMode === 'dropoff') { tempDropoff = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
@@ -454,7 +479,7 @@
             } else Swal.fire('Error', 'Geolocation not supported', 'error');
         };
         document.getElementById('publishBtn').onclick = async () => {
-            if (!tempPickup || !tempDropoff) return Swal.fire('Error', 'Set pickup and dropoff', 'warning');
+            if (!tempPickup || !tempDropoff) return Swal.fire('Error', 'Please set pickup and dropoff points', 'warning');
             let price = parseFloat(document.getElementById('priceInput').value);
             if (isNaN(price)) price = autoPrice() || 0;
             const req = {
@@ -467,7 +492,7 @@
                 createdAt: serverTimestamp()
             };
             await addDoc(collection(db, "requests"), req);
-            Swal.fire({ title: 'Published!', icon: 'success', timer: 2000, showConfirmButton: false });
+            Swal.fire({ title: 'Request sent!', text: 'Drivers will see your request', icon: 'success', timer: 2000, showConfirmButton: false });
             showNotification('New request', 'Drivers can see it');
         };
         const searchInput = document.getElementById('searchInput'), resultsDiv = document.getElementById('searchResults');
@@ -490,15 +515,16 @@
                 });
             }, 400);
         });
-        document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
-        document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search first'); };
+        document.getElementById('setPickupSearch').onclick = () => { if (lastSearchLoc) { tempPickup = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search for a place first'); };
+        document.getElementById('setDropoffSearch').onclick = () => { if (lastSearchLoc) { tempDropoff = { lat: lastSearchLoc.lat, lng: lastSearchLoc.lng }; updatePickupDropoffDisplay(); autoPrice(); } else Swal.fire('Search for a place first'); };
         document.getElementById('saveLocationBtn').onclick = async () => {
-            if (!lastSearchLoc) return Swal.fire('Search first');
-            const { value: name } = await Swal.fire({ title: 'Save place', input: 'text', inputLabel: 'Name' });
+            if (!lastSearchLoc) return Swal.fire('Search for a place first');
+            const { value: name } = await Swal.fire({ title: 'Save this place', input: 'text', inputLabel: 'Name (e.g., Home, Work)', inputPlaceholder: 'My place' });
             if (!name) return;
             savedPlaces.push({ name, lat: lastSearchLoc.lat, lng: lastSearchLoc.lng, address: lastSearchLoc.name });
             await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
             renderSavedPlaces();
+            Swal.fire('Saved!', '', 'success');
         };
         document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
     }
@@ -508,25 +534,25 @@
         const my = allRequests.filter(r => r.customerId === currentUser.uid);
         const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
         if (!active) {
-            container.innerHTML = `<div class="text-center py-8 text-gray-400">No active request</div>`;
+            container.innerHTML = `<div class="text-center py-8 text-gray-400">You have no active trip</div>`;
             return;
         }
         let ratingHtml = '';
         if (active.status === 'delivered' && !active.rated) {
-            ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment" class="mt-2 text-sm"><button id="submitRating" class="btn-primary text-xs mt-2">Submit</button></div>`;
+            ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment (optional)" class="mt-2 text-sm"><button id="submitRating" class="btn-primary text-xs mt-2">Submit</button></div>`;
         }
         container.innerHTML = `
             <div class="space-y-2">
-                <div class="flex justify-between"><span class="font-semibold">#${active.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
-                <div><span class="text-gray-500">Type:</span> ${active.type}</div>
-                <div><span class="text-gray-500">Cargo:</span> ${active.cargoDetail}</div>
+                <div class="flex justify-between"><span class="font-semibold">Trip #${active.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
+                <div><span class="text-gray-500">Service:</span> ${active.type}</div>
+                <div><span class="text-gray-500">Details:</span> ${active.cargoDetail}</div>
                 <div><span class="text-gray-500">Price:</span> ${CURRENCY}${active.price}</div>
                 <div><span class="text-gray-500">Payment:</span> ${active.paymentMethod}</div>
                 ${active.driverName ? `
-                    <div><span class="text-gray-500">Driver:</span> ${active.driverName}</div>
+                    <div class="border-t pt-2 mt-2"><span class="text-gray-500">Driver:</span> ${active.driverName}</div>
                     <div><span class="text-gray-500">Car:</span> ${active.driverCar || '—'}</div>
                     <div><span class="text-gray-500">Plate:</span> ${active.driverPlate || '—'}</div>
-                ` : '<div class="text-gray-400">Waiting for driver...</div>'}
+                ` : '<div class="text-gray-400">Waiting for a driver...</div>'}
                 ${ratingHtml}
             </div>`;
         if (active.status === 'delivered' && !active.rated) {
@@ -536,7 +562,7 @@
                 s.addEventListener('click', () => { selected = parseInt(s.dataset.rating); stars.forEach(st => st.style.color = (parseInt(st.dataset.rating) <= selected) ? '#f59e0b' : '#d1d5db'); });
             });
             document.getElementById('submitRating').onclick = async () => {
-                if (!selected) return Swal.fire('Select rating');
+                if (!selected) return Swal.fire('Select a rating');
                 const comment = document.getElementById('ratingComment').value;
                 await rateDriver(active.id, active.driverId, selected, comment);
                 await updateDoc(doc(db, "requests", active.id), { rated: true });
@@ -545,14 +571,13 @@
         }
     }
 
-    // Customer History Tab
     function renderCustomerHistoryTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = `<div class="text-center py-8 text-gray-400">No past trips</div>`; return; }
         container.innerHTML = my.map(r => `
             <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center">
                 <div><span class="font-medium">#${r.id.substring(0,6)}</span> ${r.type} – ${CURRENCY}${r.price}</div>
-                <button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View map</button>
+                <button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button>
             </div>
         `).join('');
         document.querySelectorAll('.view-trip').forEach(btn => {
@@ -560,11 +585,11 @@
                 const trip = allRequests.find(r => r.id === btn.dataset.id);
                 if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
                     Swal.fire({
-                        title: 'Route',
+                        title: 'Trip route',
                         html: `<div id="miniMap" style="height:200px;"></div>`,
                         didOpen: () => {
                             const map = L.map('miniMap').setView([trip.pickupLatLng.lat, trip.pickupLatLng.lng], 12);
-                            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                             L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
                             L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
                             L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {color: 'var(--primary)'}).addTo(map);
@@ -593,12 +618,11 @@
                 <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4">
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='map'?'tab-active':''}" data-tab="map">🗺️ Map</button>
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Available</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 Active</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 Active trip</button>
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
                 </div>
                 <div id="tabContent" class="card p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        // Theme dots
         document.querySelectorAll('.theme-dot').forEach(dot => {
             dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
         });
@@ -629,7 +653,9 @@
     function initDriverMap() {
         if (driverMap) driverMap.remove();
         driverMap = L.map('driverMap').setView([driverData.currentLat, driverData.currentLng], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(driverMap);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(driverMap);
         driverMarker = L.marker([driverData.currentLat, driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap);
         window.driverMap = driverMap;
     }
@@ -643,7 +669,7 @@
 
     function renderDriverAvailableTab(container) {
         const pending = allRequests.filter(r => r.status === 'pending');
-        if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No pending requests</div>'; return; }
+        if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No requests available</div>'; return; }
         container.innerHTML = pending.map(req => `
             <div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
                 <div><span class="font-medium">${req.type}</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
@@ -667,7 +693,7 @@
                     driverData.activeRequestId = req.id; driverData.status = "busy";
                     renderDriverTabs();
                     showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
-                } else Swal.fire('Cannot accept', 'Busy or taken', 'warning');
+                } else Swal.fire('Cannot accept', 'You are already busy or the request was taken', 'warning');
             });
         });
     }
@@ -682,9 +708,9 @@
             <div class="space-y-3">
                 <div class="flex justify-between"><span class="font-semibold">#${trip.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
                 <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
-                <div><span class="text-gray-500">Cargo:</span> ${trip.cargoDetail}</div>
+                <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
                 <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
-                <div><span class="text-gray-500">Dropoff distance:</span> ${distToDropoff.toFixed(2)} km ${distToDropoff ? `(ETA ~${Math.round(distToDropoff/30*60)} min)` : ''}</div>
+                <div><span class="text-gray-500">Distance to dropoff:</span> ${distToDropoff.toFixed(2)} km ${distToDropoff ? `(ETA ~${Math.round(distToDropoff/30*60)} min)` : ''}</div>
                 <div class="flex flex-wrap gap-2">
                     <button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📍 Move to pickup</button>
                     <button id="moveToDropoff" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>🏁 Move to dropoff</button>
@@ -722,7 +748,6 @@
         `).join('');
     }
 
-    // Chat
     async function loadChat(requestId) {
         if (chatUnsub) chatUnsub();
         const chatRef = collection(db, "chats", requestId, "messages");
@@ -746,7 +771,7 @@
         }
     }
 
-    // ---------- ADMIN PANEL (with theme support) ----------
+    // ---------- ADMIN PANEL ----------
     async function renderAdminPanel() {
         const usersSnap = await getDocs(collection(db, "users"));
         const driversSnap = await getDocs(collection(db, "drivers"));
@@ -771,7 +796,6 @@
                 <div class="card p-4 mb-4"><h3 class="font-semibold">📋 Requests</h3><button id="exportCSV" class="btn-primary text-sm px-3 py-1 mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-48 overflow-auto"></div></div>
                 <div class="card p-4"><h3 class="font-semibold">👤 User Management (demo)</h3><div id="userManagementList"></div></div>
             </div>`;
-        // Theme dots
         document.querySelectorAll('.theme-dot').forEach(dot => {
             dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
         });
