@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiMove Zambia</title>
+    <title>YP4f1n – Zambia Logistics</title>
+    <!-- Favicon (emoji) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -12,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* ----- Theme variables ----- */
+        /* ----- Theme variables (unchanged) ----- */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
@@ -58,6 +59,7 @@
         .theme-dot:hover { border-color: var(--primary); }
         .theme-dot.active { border-color: var(--text); }
         body.dark input, body.dark select { background: #334155; border-color: #475569; color: white; }
+        .chat-message { padding: 4px 0; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -102,6 +104,14 @@
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
     const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
+
+    // Helper to format date
+    function formatDate(timestamp) {
+        if (!timestamp) return 'Unknown date';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return date.toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) +
+               ', ' + date.toLocaleTimeString('en-ZM', { hour: '2-digit', minute: '2-digit' });
+    }
 
     function haversine(lat1, lng1, lat2, lng2) {
         const R = 6371;
@@ -223,7 +233,7 @@
                     <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style="background:var(--primary-bg);">
                         <i class="fas fa-truck-fast text-4xl" style="color:var(--primary);"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Move</span></h1>
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">YP<span style="color:var(--primary);">4f1n</span></h1>
                     <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Delivery & Taxi</p>
                     <input type="email" id="loginEmail" placeholder="Email" class="mb-3">
                     <input type="password" id="loginPassword" placeholder="Password" class="mb-3">
@@ -402,7 +412,6 @@
         attachCustomerMapEvents();
         renderSavedPlaces();
         if (tempPickup && tempDropoff) autoPrice();
-        // Click on location boxes to change mode
         document.getElementById('pickupBox').addEventListener('click', () => { mapSelectMode = 'pickup'; Swal.fire('Pickup mode','Click on the map to set your pickup point','info'); });
         document.getElementById('dropoffBox').addEventListener('click', () => { mapSelectMode = 'dropoff'; Swal.fire('Dropoff mode','Click on the map to set your destination','info'); });
     }
@@ -410,7 +419,6 @@
     function initCustomerMap() {
         if (customerMap) customerMap.remove();
         customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
-        // ========== NEW TILE LAYER WITH LABELS ==========
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(customerMap);
@@ -529,7 +537,7 @@
         document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
     }
 
-    // Customer Active Tab (shows driver details)
+    // Customer Active Tab (shows driver details + chat)
     function renderCustomerActiveTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid);
         const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
@@ -540,6 +548,16 @@
         let ratingHtml = '';
         if (active.status === 'delivered' && !active.rated) {
             ratingHtml = `<div class="mt-2"><span>Rate driver: </span><span class="star-rating" data-rating="1">★</span><span class="star-rating" data-rating="2">★</span><span class="star-rating" data-rating="3">★</span><span class="star-rating" data-rating="4">★</span><span class="star-rating" data-rating="5">★</span><input type="text" id="ratingComment" placeholder="Comment (optional)" class="mt-2 text-sm"><button id="submitRating" class="btn-primary text-xs mt-2">Submit</button></div>`;
+        }
+        let chatHtml = '';
+        if (active.status === 'accepted' || active.status === 'pickedUp') {
+            chatHtml = `
+                <div class="mt-3 border-t pt-2">
+                    <details><summary>💬 Chat with driver</summary>
+                        <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
+                        <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
+                    </details>
+                </div>`;
         }
         container.innerHTML = `
             <div class="space-y-2">
@@ -554,6 +572,7 @@
                     <div><span class="text-gray-500">Plate:</span> ${active.driverPlate || '—'}</div>
                 ` : '<div class="text-gray-400">Waiting for a driver...</div>'}
                 ${ratingHtml}
+                ${chatHtml}
             </div>`;
         if (active.status === 'delivered' && !active.rated) {
             const stars = document.querySelectorAll('.star-rating');
@@ -569,14 +588,22 @@
                 renderCustomerTabs();
             };
         }
+        // Chat setup if active
+        if (active.status === 'accepted' || active.status === 'pickedUp') {
+            loadChat(active.id);
+        }
     }
 
+    // Customer History with date/time
     function renderCustomerHistoryTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = `<div class="text-center py-8 text-gray-400">No past trips</div>`; return; }
         container.innerHTML = my.map(r => `
             <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center">
-                <div><span class="font-medium">#${r.id.substring(0,6)}</span> ${r.type} – ${CURRENCY}${r.price}</div>
+                <div>
+                    <span class="font-medium">#${r.id.substring(0,6)}</span> ${r.type} – ${CURRENCY}${r.price}
+                    <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
+                </div>
                 <button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button>
             </div>
         `).join('');
@@ -717,7 +744,12 @@
                     <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
                     <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
                 </div>
-                <div class="mt-2"><details><summary>💬 Chat with customer</summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>
+                <div class="mt-2">
+                    <details><summary>💬 Chat with customer</summary>
+                        <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
+                        <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
+                    </details>
+                </div>
             </div>`;
         document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
         document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
@@ -737,17 +769,25 @@
                 showNotification('Delivered', `Trip completed with ${trip.customerName}`);
             }
         };
-        if (trip.id) loadChat(trip.id);
+        // Chat
+        loadChat(trip.id);
     }
 
     function renderDriverHistoryTab(container) {
         const my = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No completed trips</div>'; return; }
         container.innerHTML = my.map(r => `
-            <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between"><span>#${r.id.substring(0,6)} ${r.type} – ${CURRENCY}${r.price}</span><span class="text-sm text-gray-400">${r.customerName}</span></div>
+            <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
+                <div>
+                    <span>#${r.id.substring(0,6)} ${r.type} – ${CURRENCY}${r.price}</span>
+                    <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
+                </div>
+                <span class="text-sm text-gray-400">${r.customerName}</span>
+            </div>
         `).join('');
     }
 
+    // ---------- CHAT FUNCTION ----------
     async function loadChat(requestId) {
         if (chatUnsub) chatUnsub();
         const chatRef = collection(db, "chats", requestId, "messages");
@@ -755,19 +795,30 @@
         chatUnsub = onSnapshot(q, (snap) => {
             const messages = snap.docs.map(d => d.data());
             const chatDiv = document.getElementById('chatMessages');
-            if (chatDiv) chatDiv.innerHTML = messages.map(m => `<div><b>${m.senderName}:</b> ${m.text}</div>`).join('');
+            if (chatDiv) {
+                chatDiv.innerHTML = messages.map(m => `<div class="chat-message"><b>${m.senderName}:</b> ${m.text}</div>`).join('');
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }
         });
         const sendBtn = document.getElementById('sendChat');
         const input = document.getElementById('chatInput');
         if (sendBtn && input) {
-            sendBtn.onclick = async () => {
+            // Remove old listeners to avoid duplicates
+            const newSend = async () => {
                 const text = input.value.trim();
                 if (!text) return;
                 await addDoc(collection(db, "chats", requestId, "messages"), {
-                    senderId: currentUser.uid, senderName: currentUser.email, text, timestamp: serverTimestamp()
+                    senderId: currentUser.uid,
+                    senderName: currentUser.email,
+                    text,
+                    timestamp: serverTimestamp()
                 });
                 input.value = '';
             };
+            sendBtn.onclick = newSend;
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') newSend();
+            });
         }
     }
 
@@ -807,7 +858,7 @@
             const rows = allRequests.map(r => [r.id, r.type, r.status, r.price, r.customerName, r.driverName||'', r.driverCar||'', r.driverPlate||'', r.paymentMethod, r.createdAt?.toDate?.()?.toISOString()||'']);
             const csv = [headers, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
             const blob = new Blob([csv], {type: 'text/csv'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'logimove_requests.csv'; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'yp4f1n_requests.csv'; a.click();
             Swal.fire('Exported!');
         };
         const userMgmt = document.getElementById('userManagementList');
