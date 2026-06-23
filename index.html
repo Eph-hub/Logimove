@@ -162,11 +162,11 @@
 
     // ---------- AUTH ----------
     async function saveUserToFirestore(user, role, name, extra={}) {
-        await setDoc(doc(db,"users",user.uid),{email:user.email,name,role,createdAt:serverTimestamp()});
+        await setDoc(doc(db, "users", user.uid),{email:user.email, name, role,createdAt:serverTimestamp()});
         if(role==='driver') {
             await setDoc(doc(db,"drivers",user.uid),{
                 currentLat:-15.3875,currentLng:28.3228,
-                status:"online",activeRequestId:null,
+                status: "online",activeRequestId: null,
                 averageRating:0,ratingsCount:0,
                 phone:extra.phone||'',
                 carModel:extra.carModel||'',
@@ -265,6 +265,7 @@
         document.documentElement.style.setProperty('--primary-ring',t.primary+'40');
         localStorage.setItem('theme',name);
         currentTheme=name;
+        // Update active class on any theme dots in the DOM
         document.querySelectorAll('.theme-dot').forEach(d=>d.classList.toggle('active',d.dataset.theme===name));
     }
     applyTheme(currentTheme);
@@ -347,7 +348,7 @@
         else renderDriverTabs();
     }
 
-    // ---------- HEADER ----------
+    // ---------- HEADER (no theme dots) ----------
     function renderHeader(title, logoutId) {
         return `
             <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -405,20 +406,27 @@
             html: html,
             confirmButtonText: 'Close',
             didOpen: () => {
-                document.querySelectorAll('#swal2-content .theme-dot').forEach(d => {
-                    d.addEventListener('click', () => {
-                        applyTheme(d.dataset.theme);
-                        document.querySelectorAll('#swal2-content .theme-dot').forEach(dd => {
-                            dd.classList.toggle('active', dd.dataset.theme === currentTheme);
+                // Attach theme dot events inside modal
+                const modalContent = document.getElementById('swal2-content');
+                if (modalContent) {
+                    modalContent.querySelectorAll('.theme-dot').forEach(d => {
+                        d.addEventListener('click', () => {
+                            applyTheme(d.dataset.theme);
+                            // Update active class inside modal
+                            modalContent.querySelectorAll('.theme-dot').forEach(dd => {
+                                dd.classList.toggle('active', dd.dataset.theme === currentTheme);
+                            });
                         });
                     });
-                });
-                document.getElementById('profileDarkToggle').addEventListener('click', () => {
-                    document.body.classList.toggle('light');
-                    localStorage.setItem('lightMode', document.body.classList.contains('light'));
-                    const btn = document.getElementById('profileDarkToggle');
-                    btn.innerText = document.body.classList.contains('light') ? '🌙 Dark Mode' : '☀️ Light Mode';
-                });
+                    const darkToggle = document.getElementById('profileDarkToggle');
+                    if (darkToggle) {
+                        darkToggle.addEventListener('click', () => {
+                            document.body.classList.toggle('light');
+                            localStorage.setItem('lightMode', document.body.classList.contains('light'));
+                            darkToggle.innerText = document.body.classList.contains('light') ? '🌙 Dark Mode' : '☀️ Light Mode';
+                        });
+                    }
+                }
             }
         });
     }
@@ -453,6 +461,7 @@
                 renderDriverTabs();
             }
         };
+        // Hamburger menu
         document.querySelectorAll('#dropdownMenu a').forEach(item => {
             item.addEventListener('click', () => {
                 const tab = item.dataset.tab;
@@ -470,6 +479,7 @@
             const btn = document.getElementById('hamburgerBtn');
             if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.classList.remove('open');
         });
+        // Service chips
         document.querySelectorAll('.service-chip').forEach(chip => {
             chip.addEventListener('click', () => {
                 const tab = chip.dataset.service;
@@ -1278,7 +1288,7 @@
             item.addEventListener('click', () => {
                 const tab = item.dataset.tab;
                 if (tab === 'profile') { showProfileModal(); return; }
-                // For driver, we just switch the active tab within the driver dashboard
+                // For driver, we switch the active tab within driver dashboard
                 activeTab = tab;
                 renderDriverTabs();
                 document.getElementById('dropdownMenu').classList.remove('open');
