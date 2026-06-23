@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>LogiMove Zambia</title>
+    <title>LogiMoves Zm</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
     <!-- Leaflet & Routing -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <!-- Tailwind, Font Awesome, Chart.js, SweetAlert2 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -78,6 +78,9 @@
         .dropdown-menu a { display: block; padding: 0.5rem 1.5rem; color: var(--text); text-decoration: none; font-size: 0.9rem; cursor: pointer; transition: background 0.2s; }
         .dropdown-menu a:hover { background: var(--primary-bg); }
         .dropdown-menu a i { margin-right: 0.5rem; width: 1.2rem; }
+        .theme-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; margin: 4px; }
+        .theme-dot:hover { border-color: var(--text); }
+        .theme-dot.active { border-color: var(--text); }
         @media (max-width: 640px) { .map-container { height: 200px; } .service-chip { font-size: 0.7rem; padding: 0.3rem 0.7rem; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } }
     </style>
 </head>
@@ -274,7 +277,7 @@
                     <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style="background:var(--primary-bg);">
                         <i class="fas fa-truck-fast text-4xl" style="color:var(--primary);"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Move</span></h1>
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Moves</span> <span style="color:var(--primary);">Zm</span></h1>
                     <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Ride • Delivery • Food</p>
                     <input type="email" id="loginEmail" placeholder="Email" class="mb-3">
                     <input type="password" id="loginPassword" placeholder="Password" class="mb-3">
@@ -344,7 +347,7 @@
         else renderDriverTabs();
     }
 
-    // ---------- HEADER (with hamburger) ----------
+    // ---------- HEADER ----------
     function renderHeader(title, logoutId) {
         return `
             <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -369,20 +372,55 @@
                             <a data-tab="rides"><i class="fas fa-taxi"></i> Rides</a>
                             <a data-tab="navigation"><i class="fas fa-directions"></i> Navigation</a>
                             <a data-tab="history"><i class="fas fa-history"></i> History</a>
-                            <a data-tab="profile"><i class="fas fa-user"></i> Profile</a>
+                            <a data-tab="profile" id="profileMenu"><i class="fas fa-user"></i> Profile</a>
                         </div>
                     </div>
                     <button id="refreshBtn" class="text-sm bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" title="Refresh">🔄</button>
-                    <details class="relative">
-                        <summary class="cursor-pointer text-sm bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full">🎨</summary>
-                        <div class="absolute right-0 mt-1 bg-white dark:bg-gray-800 shadow rounded p-2 flex flex-wrap gap-1" style="z-index:20; min-width:120px;">
-                            ${themes.map(t=>`<div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>`).join('')}
-                        </div>
-                    </details>
                     <button id="modeToggle" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm">${document.body.classList.contains('light')?'🌙':'☀️'}</button>
                     <button id="${logoutId}" class="text-red-500 text-sm font-medium">Logout</button>
                 </div>
             </div>`;
+    }
+
+    // ---------- PROFILE MODAL ----------
+    function showProfileModal() {
+        const html = `
+            <div style="text-align:left;">
+                <p><strong>Email:</strong> ${currentUser?.email}</p>
+                <p><strong>Role:</strong> ${currentRole}</p>
+                <hr class="my-2 border-gray-300">
+                <p class="font-semibold">🎨 Choose Theme</p>
+                <div class="flex flex-wrap justify-center my-2">
+                    ${themes.map(t => `
+                        <div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>
+                    `).join('')}
+                </div>
+                <div class="text-center mt-2">
+                    <button id="profileDarkToggle" class="px-4 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm">${document.body.classList.contains('light')?'🌙 Dark Mode':'☀️ Light Mode'}</button>
+                </div>
+            </div>
+        `;
+        Swal.fire({
+            title: '👤 Profile',
+            html: html,
+            confirmButtonText: 'Close',
+            didOpen: () => {
+                document.querySelectorAll('#swal2-content .theme-dot').forEach(d => {
+                    d.addEventListener('click', () => {
+                        applyTheme(d.dataset.theme);
+                        document.querySelectorAll('#swal2-content .theme-dot').forEach(dd => {
+                            dd.classList.toggle('active', dd.dataset.theme === currentTheme);
+                        });
+                    });
+                });
+                document.getElementById('profileDarkToggle').addEventListener('click', () => {
+                    document.body.classList.toggle('light');
+                    localStorage.setItem('lightMode', document.body.classList.contains('light'));
+                    const btn = document.getElementById('profileDarkToggle');
+                    btn.innerText = document.body.classList.contains('light') ? '🌙 Dark Mode' : '☀️ Light Mode';
+                });
+            }
+        });
     }
 
     // ---------- CUSTOMER DASHBOARD ----------
@@ -399,7 +437,7 @@
                 </div>
                 <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        // Event bindings
+        // Bind events
         document.getElementById('driverModeToggle').onclick = async () => {
             if (currentRole === 'driver') {
                 await updateDoc(doc(db, "users", currentUser.uid), { role: 'customer' });
@@ -418,7 +456,7 @@
         document.querySelectorAll('#dropdownMenu a').forEach(item => {
             item.addEventListener('click', () => {
                 const tab = item.dataset.tab;
-                if (tab === 'profile') { Swal.fire({ title: 'Profile', text: 'Edit profile coming soon', icon: 'info' }); return; }
+                if (tab === 'profile') { showProfileModal(); return; }
                 activeTab = tab;
                 renderCustomerTabs();
                 document.getElementById('dropdownMenu').classList.remove('open');
@@ -439,7 +477,6 @@
                 renderCustomerTabs();
             });
         });
-        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
         document.getElementById('logoutBtn').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
@@ -457,7 +494,7 @@
         updateNewOrderBadge();
     }
 
-    // ---------- MAP TAB (Delivery) ----------
+    // ---------- CUSTOMER MAP TAB ----------
     function renderCustomerMapTab(container) {
         serviceType = 'delivery';
         const html = `
@@ -509,11 +546,10 @@
                 <button id="publishBtn" class="btn-primary w-full">Request</button>
             </div>`;
         container.innerHTML = html;
-        // ---- attach events ----
         attachMapEvents(container);
     }
 
-    // ---------- RIDES TAB (Taxi) ----------
+    // ---------- RIDES TAB ----------
     function renderCustomerRidesTab(container) {
         serviceType = 'taxi';
         const html = `
@@ -557,7 +593,6 @@
 
     // ---------- SHARED MAP EVENTS ----------
     function attachMapEvents(container) {
-        // Main search, pickup, dropoff
         const mainInput = document.getElementById('mainSearchInput');
         const mainDropdown = document.getElementById('mainSearchDropdown');
         const mainTime = document.getElementById('mainSearchTime');
@@ -728,7 +763,6 @@
             }
         };
 
-        // Close dropdowns
         document.addEventListener('click', (e) => {
             if (!mainInput.contains(e.target) && !mainDropdown.contains(e.target)) mainDropdown.style.display = 'none';
             if (!pickupInput.contains(e.target) && !pickupDropdown.contains(e.target)) pickupDropdown.style.display = 'none';
@@ -818,7 +852,6 @@
                 createMarker: function() { return null; }
             }).addTo(customerMap);
         }
-        // Driver tracking
         const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
         if (activeTrip && activeTrip.driverId) {
             if (driverPosUnsub) driverPosUnsub();
@@ -1202,9 +1235,7 @@
         getFoodOrders();
     }
 
-    // ============================================================
-    // =============== DRIVER DASHBOARD ============================
-    // ============================================================
+    // ========== DRIVER DASHBOARD ==========
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         const total = completed.reduce((s,r) => s + r.price, 0);
@@ -1227,8 +1258,7 @@
                 </div>
                 <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        // Bind events (similar to customer)
-        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
+        // Bind events
         document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
             activeTab=btn.dataset.tab;
             if (activeTab === 'requests') resetNewOrderBadge();
@@ -1243,14 +1273,15 @@
             Swal.fire({ title: 'Switched to Passenger mode', icon: 'info', timer: 1500, showConfirmButton: false });
             renderCustomerTabs();
         };
-        // Hamburger
+        // Hamburger for driver
         document.querySelectorAll('#dropdownMenu a').forEach(item => {
             item.addEventListener('click', () => {
                 const tab = item.dataset.tab;
-                if (tab === 'profile') { Swal.fire({ title: 'Profile', text: 'Edit profile coming soon', icon: 'info' }); return; }
-                // For driver, we just stay in driver mode but switch active tab
-                // We'll just treat it as a view change
-                // Not implemented for driver to avoid complexity
+                if (tab === 'profile') { showProfileModal(); return; }
+                // For driver, we just switch the active tab within the driver dashboard
+                activeTab = tab;
+                renderDriverTabs();
+                document.getElementById('dropdownMenu').classList.remove('open');
             });
         });
         document.getElementById('hamburgerBtn').onclick = () => {
@@ -1318,7 +1349,7 @@
                 container.innerHTML = '<div class="text-center py-8 text-gray-400">No available requests</div>';
             } else {
                 container.innerHTML = combined.map(req => {
-                    const tripDisplay = req.tripNumber? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
+                    const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
                     return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
                         <div><span class="font-medium">${tripDisplay} ${req.displayType}</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
                         <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}" data-food="${req.isFood||false}">Accept</button>
@@ -1329,7 +1360,7 @@
                         const id = btn.dataset.id;
                         const isFood = btn.dataset.food === 'true';
                         if (isFood) {
-                            await updateDoc(doc(db, "foodOrders", id), { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
+                            await updateDoc(doc(db,"foodOrders", id), { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
                             showNotification('Food order accepted', 'You will deliver this order.');
                             renderDriverTabs();
                         } else {
@@ -1342,9 +1373,9 @@
                                     driverId: currentUser.uid,
                                     driverName: currentUser.email,
                                     driverCar: drv.carModel || '',
-                                    driverPlate: drv.plate ||.''
+                                    driverPlate: drv.plate || ''
                                 });
-                                await updateDoc(doc(db, "drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
+                                await updateDoc(doc(db,"drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
                                 driverData.activeRequestId = req.id; driverData.status = "busy";
                                 renderDriverTabs();
                                 showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
@@ -1363,8 +1394,8 @@
         if (!activeId) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No active trip</div>'; return; }
         const trip = allRequests.find(r => r.id === activeId);
         if (!trip) { container.innerHTML = '<div class="text-center py-8 text-gray-400">Loading...</div>'; return; }
-        const distToDropoff = trip.dropoffLatLng? haversine(driverData.currentLat,driverData.currentLng,trip.dropoffLatLng.lat,trip.dropoffLatLng.lng) : 0;
-        const tripDisplay = trip.tripNumber? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
+        const distToDropoff = trip.dropoffLatLng ? haversine(driverData.currentLat,driverData.currentLng,trip.dropoffLatLng.lat,trip.dropoffLatLng.lng) : 0;
+        const tripDisplay = trip.tripNumber ? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
         let progressHtml = '';
         if (trip.status === 'accepted') progressHtml = `<div class="progress-step flex items-center gap-2"><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Accepted <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-primary"></span> Go to pickup <span class="flex-1 h-0.5 bg-gray-300"></span><span class="dot w-3 h-3 rounded-full bg-gray-300"></span> Deliver</div>`;
         else if (trip.status === 'pickedUp') progressHtml = `<div class="progress-step flex items-center gap-2"><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Accepted <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Picked up <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-primary"></span> Delivering</div>`;
@@ -1466,7 +1497,7 @@
         }
     }
 
-    // ---------- ADMIN ----------
+    // ---------- ADMIN PANEL ----------
     async function renderAdminPanel() {
         const usersSnap=await getDocs(collection(db,"users"));
         const driversSnap=await getDocs(collection(db,"drivers"));
@@ -1483,14 +1514,13 @@
                 <div class="card p-4 mb-4"><h3 class="font-semibold">📋 Requests</h3><button id="exportCSV" class="btn-primary text-sm px-3 py-1 mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-48 overflow-auto"></div></div>
                 <div class="card p-4"><h3 class="font-semibold">👤 User Management (demo)</h3><div id="userManagementList"></div></div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
         document.getElementById('adminLogout').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderAdminPanel();};
         new Chart(document.getElementById('requestsChart'),{type:'line',data:{labels:Object.keys(byDay),datasets:[{label:'Requests',data:Object.values(byDay),borderColor:'var(--primary)'}]}});
         document.getElementById('adminRequestsList').innerHTML=allRequests.map(r=>{const td=r.tripNumber?`#${r.tripNumber}`:`#${r.id.substring(0,6)}`; return `<div class="border-b py-1 text-sm">${td} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`;}).join('');
         document.getElementById('exportCSV').onclick=()=>{
-            const headers=['Trip Number', 'ID', 'Type',' Status',' Price',' Customer', 'Driver', 'Car', 'Plate', 'Payment',' Created', 'Pickup Address',' Dropoff Address'];
+            const headers=['Trip Number','ID','Type','Status','Price','Customer','Driver','Car','Plate','Payment','Created','Pickup Address','Dropoff Address'];
             const rows=allRequests.map(r=>[r.tripNumber||'',r.id,r.type,r.status,r.price,r.customerName,r.driverName||'',r.driverCar||'',r.driverPlate||'',r.paymentMethod,r.createdAt?.toDate?.()?.toISOString()||'',r.pickupAddress||'',r.dropoffAddress||'']);
             const csv=[headers,...rows].map(row=>row.map(c=>`"${c}"`).join(',')).join('\n');
             const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='logimove_requests.csv'; a.click(); Swal.fire('Exported!');
@@ -1499,8 +1529,8 @@
         const allUsers=await getDocs(collection(db,"users"));
         userMgmt.innerHTML='';
         for(const u of allUsers.docs){const data=u.data(); userMgmt.innerHTML+=`<div class="border-b py-1 flex justify-between"><span>${data.email} (${data.role})</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset</button></div></div>`;}
-        document.querySelectorAll('.suspendBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo',' Suspend action (simulated)', 'info')));
-        document.querySelectorAll('.resetBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo', 'Reset password email (simulated)', 'info')));
+        document.querySelectorAll('.suspendBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Suspend action (simulated)','info')));
+        document.querySelectorAll('.resetBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Reset password email (simulated)','info')));
     }
 
     // ---------- BOOT ----------
