@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* ----- Theme variables ----- */
+        /* ----- Theme variables (same as before) ----- */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
@@ -69,7 +69,7 @@
     // ---------- FIREBASE IMPORTS ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
     const firebaseConfig = {
@@ -86,7 +86,7 @@
     const db = getFirestore(app);
     const messaging = getMessaging(app);
 
-    // ---------- GLOBALS ----------
+    // ---------- GLOBALS (unchanged) ----------
     let currentUser = null, currentRole = null;
     let tempPickup = null, tempDropoff = null;
     let serviceType = "delivery";
@@ -100,7 +100,6 @@
     let fcmToken = null;
     let chatUnsub = null;
     let activeTab = 'map';
-    // Route polyline references
     let customerRouteLine = null;
     let driverRouteLine = null;
 
@@ -108,7 +107,6 @@
     const CURRENCY = "K";
     const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
 
-    // Helper to format date
     function formatDate(timestamp) {
         if (!timestamp) return 'Unknown date';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -123,6 +121,7 @@
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
+
     function autoPrice() {
         if (!tempPickup || !tempDropoff) return 0;
         const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
@@ -149,6 +148,7 @@
             fcmToken = token;
         } catch(e) { console.warn("FCM error", e); }
     }
+
     function showNotification(title, body) {
         if (Notification.permission === 'granted') new Notification(title, { body });
         else Swal.fire({ title, text: body, icon: 'info', toast: true, position: 'top-end', timer: 3000 });
@@ -226,10 +226,9 @@
             d.classList.toggle('active', d.dataset.theme === themeName);
         });
     }
-    // Apply initially
     applyTheme(currentTheme);
 
-    // ---------- LOGIN ----------
+    // ---------- LOGIN (unchanged) ----------
     function renderLogin() {
         document.getElementById('appContainer').innerHTML = `
             <div class="min-h-screen flex items-center justify-center p-4">
@@ -350,15 +349,8 @@
                 </div>
                 <div id="tabContent" class="card p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => {
-            dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
-        });
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                activeTab = btn.dataset.tab;
-                renderCustomerTabs();
-            });
-        });
+        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { activeTab = btn.dataset.tab; renderCustomerTabs(); }));
         document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
         const content = document.getElementById('tabContent');
         if (activeTab === 'map') renderCustomerMapTab(content);
@@ -366,7 +358,7 @@
         else if (activeTab === 'history') renderCustomerHistoryTab(content);
     }
 
-    // ---------- CUSTOMER MAP TAB (with route) ----------
+    // ---------- CUSTOMER MAP TAB ----------
     function renderCustomerMapTab(container) {
         const html = `
             <div class="space-y-4">
@@ -424,9 +416,7 @@
     function initCustomerMap() {
         if (customerMap) customerMap.remove();
         customerMap = L.map('customerMap').setView([-15.3875, 28.3228], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(customerMap);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(customerMap);
         customerMap.on('click', (e) => {
             if (mapSelectMode === 'pickup') { tempPickup = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
             else if (mapSelectMode === 'dropoff') { tempDropoff = e.latlng; updatePickupDropoffDisplay(); autoPrice(); }
@@ -434,9 +424,7 @@
         if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
         if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
         window.customerMap = customerMap;
-        // Draw route if both points exist
         drawCustomerRoute();
-        // Listen for active trip driver location
         const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
         if (activeTrip && activeTrip.driverId) {
             if (window.driverPosUnsub) window.driverPosUnsub();
@@ -455,16 +443,9 @@
     }
 
     function drawCustomerRoute() {
-        if (customerRouteLine && window.customerMap) {
-            window.customerMap.removeLayer(customerRouteLine);
-            customerRouteLine = null;
-        }
+        if (customerRouteLine && window.customerMap) { window.customerMap.removeLayer(customerRouteLine); customerRouteLine = null; }
         if (tempPickup && tempDropoff && window.customerMap) {
-            customerRouteLine = L.polyline([[tempPickup.lat, tempPickup.lng], [tempDropoff.lat, tempDropoff.lng]], {
-                color: 'var(--primary)',
-                weight: 3,
-                dashArray: '5, 10'
-            }).addTo(window.customerMap);
+            customerRouteLine = L.polyline([[tempPickup.lat, tempPickup.lng], [tempDropoff.lat, tempDropoff.lng]], { color: 'var(--primary)', weight: 3, dashArray: '5,10' }).addTo(window.customerMap);
         }
     }
 
@@ -518,8 +499,7 @@
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(pos => {
                     tempPickup = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    updatePickupDropoffDisplay();
-                    autoPrice();
+                    updatePickupDropoffDisplay(); autoPrice();
                     if (customerMap) customerMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
                 }, () => Swal.fire('Error', 'Could not get location', 'error'));
             } else Swal.fire('Error', 'Geolocation not supported', 'error');
@@ -528,18 +508,43 @@
             if (!tempPickup || !tempDropoff) return Swal.fire('Error', 'Please set pickup and dropoff points', 'warning');
             let price = parseFloat(document.getElementById('priceInput').value);
             if (isNaN(price)) price = autoPrice() || 0;
-            const req = {
-                customerId: currentUser.uid, customerName: currentUser.email, type: serviceType,
-                cargoDetail: document.getElementById('cargoSelect').value, price, paymentMethod: document.getElementById('paymentSelect').value,
-                status: 'pending', driverId: null, driverName: null,
-                driverCar: '', driverPlate: '',
-                pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
-                dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
-                createdAt: serverTimestamp()
-            };
-            await addDoc(collection(db, "requests"), req);
-            Swal.fire({ title: 'Request sent!', text: 'Drivers will see your request', icon: 'success', timer: 2000, showConfirmButton: false });
-            showNotification('New request', 'Drivers can see it');
+            const detail = document.getElementById('cargoSelect').value;
+            const payment = document.getElementById('paymentSelect').value;
+            try {
+                // ---- TRIP COUNTER ----
+                const counterRef = doc(db, "counters", "requests");
+                let tripNumber = 1;
+                await runTransaction(db, async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    if (counterDoc.exists()) {
+                        tripNumber = counterDoc.data().current + 1;
+                    }
+                    transaction.set(counterRef, { current: tripNumber });
+                });
+                // ---- CREATE REQUEST ----
+                const req = {
+                    customerId: currentUser.uid,
+                    customerName: currentUser.email,
+                    type: serviceType,
+                    cargoDetail: detail,
+                    price,
+                    paymentMethod: payment,
+                    status: 'pending',
+                    driverId: null,
+                    driverName: null,
+                    driverCar: '',
+                    driverPlate: '',
+                    pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
+                    dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
+                    createdAt: serverTimestamp(),
+                    tripNumber: tripNumber   // <-- store sequential number
+                };
+                await addDoc(collection(db, "requests"), req);
+                Swal.fire({ title: 'Request sent!', text: 'Drivers will see your request', icon: 'success', timer: 2000, showConfirmButton: false });
+                showNotification('New request', 'Drivers can see it');
+            } catch(e) {
+                Swal.fire('Error', e.message, 'error');
+            }
         };
         const searchInput = document.getElementById('searchInput'), resultsDiv = document.getElementById('searchResults');
         let timeout;
@@ -575,7 +580,7 @@
         document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
     }
 
-    // Customer Active Tab (shows driver details + chat + map with route)
+    // ---------- CUSTOMER ACTIVE TAB (with sequential #) ----------
     function renderCustomerActiveTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid);
         const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
@@ -597,18 +602,15 @@
                     </details>
                 </div>`;
         }
-        // Mini map showing route and driver location
         let mapHtml = '';
         if (active.pickupLatLng && active.dropoffLatLng && (active.status === 'accepted' || active.status === 'pickedUp')) {
-            mapHtml = `
-                <div class="mt-3 border-t pt-2">
-                    <div class="text-sm font-semibold">📍 Live tracking</div>
-                    <div id="activeTripMiniMap" class="map-container h-40"></div>
-                </div>`;
+            mapHtml = `<div class="mt-3 border-t pt-2"><div class="text-sm font-semibold">📍 Live tracking</div><div id="activeTripMiniMap" class="map-container h-40"></div></div>`;
         }
+        // Use tripNumber if present, else fallback to id snippet
+        const tripDisplay = active.tripNumber ? `#${active.tripNumber}` : `#${active.id.substring(0,6)}`;
         container.innerHTML = `
             <div class="space-y-2">
-                <div class="flex justify-between"><span class="font-semibold">Trip #${active.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
+                <div class="flex justify-between"><span class="font-semibold">Trip ${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
                 <div><span class="text-gray-500">Service:</span> ${active.type}</div>
                 <div><span class="text-gray-500">Details:</span> ${active.cargoDetail}</div>
                 <div><span class="text-gray-500">Price:</span> ${CURRENCY}${active.price}</div>
@@ -638,7 +640,6 @@
         }
         if (active.status === 'accepted' || active.status === 'pickedUp') {
             loadChat(active.id);
-            // Mini map for tracking
             setTimeout(() => {
                 const miniMapDiv = document.getElementById('activeTripMiniMap');
                 if (miniMapDiv) {
@@ -647,15 +648,12 @@
                     L.marker([active.pickupLatLng.lat, active.pickupLatLng.lng]).addTo(miniMap).bindTooltip('Pickup');
                     L.marker([active.dropoffLatLng.lat, active.dropoffLatLng.lng]).addTo(miniMap).bindTooltip('Dropoff');
                     L.polyline([[active.pickupLatLng.lat, active.pickupLatLng.lng], [active.dropoffLatLng.lat, active.dropoffLatLng.lng]], {color: 'var(--primary)', weight: 2}).addTo(miniMap);
-                    // Show driver location if driverId
                     if (active.driverId) {
                         const driverRef = doc(db, "drivers", active.driverId);
                         const unsub = onSnapshot(driverRef, (snap) => {
                             if (snap.exists()) {
                                 const loc = snap.data();
-                                const marker = L.marker([loc.currentLat, loc.currentLng], {
-                                    icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] })
-                                }).addTo(miniMap).bindTooltip('Driver');
+                                L.marker([loc.currentLat, loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] }) }).addTo(miniMap).bindTooltip('Driver');
                                 miniMap.setView([loc.currentLat, loc.currentLng], 13);
                                 if (unsub) unsub();
                             }
@@ -666,19 +664,20 @@
         }
     }
 
-    // Customer History with date/time
+    // ---------- CUSTOMER HISTORY (with sequential #) ----------
     function renderCustomerHistoryTab(container) {
         const my = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = `<div class="text-center py-8 text-gray-400">No past trips</div>`; return; }
-        container.innerHTML = my.map(r => `
-            <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center">
+        container.innerHTML = my.map(r => {
+            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center">
                 <div>
-                    <span class="font-medium">#${r.id.substring(0,6)}</span> ${r.type} – ${CURRENCY}${r.price}
+                    <span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}
                     <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
                 </div>
                 <button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
         document.querySelectorAll('.view-trip').forEach(btn => {
             btn.addEventListener('click', () => {
                 const trip = allRequests.find(r => r.id === btn.dataset.id);
@@ -722,15 +721,8 @@
                 </div>
                 <div id="tabContent" class="card p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => {
-            dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
-        });
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                activeTab = btn.dataset.tab;
-                renderDriverTabs();
-            });
-        });
+        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { activeTab = btn.dataset.tab; renderDriverTabs(); }));
         document.getElementById('logoutDriver').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
         const content = document.getElementById('tabContent');
         if (activeTab === 'map') renderDriverMapTab(content);
@@ -740,10 +732,7 @@
     }
 
     function renderDriverMapTab(container) {
-        container.innerHTML = `
-            <div id="driverMap" class="map-container"></div>
-            <div class="flex gap-2 mt-2"><button id="gpsBtn" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">🎯 Center</button></div>
-        `;
+        container.innerHTML = `<div id="driverMap" class="map-container"></div><div class="flex gap-2 mt-2"><button id="gpsBtn" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">🎯 Center</button></div>`;
         initDriverMap();
         document.getElementById('gpsBtn').onclick = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => updateDriverLoc(pos.coords.latitude, pos.coords.longitude)); };
         document.getElementById('centerDriverMap').onclick = () => driverMap.setView([driverData.currentLat, driverData.currentLng], 14);
@@ -752,38 +741,20 @@
     function initDriverMap() {
         if (driverMap) driverMap.remove();
         driverMap = L.map('driverMap').setView([driverData.currentLat, driverData.currentLng], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(driverMap);
-        driverMarker = L.marker([driverData.currentLat, driverData.currentLng], {
-            icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] })
-        }).addTo(driverMap).bindTooltip('You');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(driverMap);
+        driverMarker = L.marker([driverData.currentLat, driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap).bindTooltip('You');
         window.driverMap = driverMap;
-        // Show active trip pickup/dropoff and route
         const activeId = driverData.activeRequestId;
         if (activeId) {
             const trip = allRequests.find(r => r.id === activeId);
             if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
                 L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
                 L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
-                L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {
-                    color: 'var(--primary)',
-                    weight: 2,
-                    dashArray: '5, 10'
-                }).addTo(driverMap);
-                // Draw route from current location to pickup if not yet picked up
+                L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], { color: 'var(--primary)', weight: 2, dashArray: '5,10' }).addTo(driverMap);
                 if (trip.status === 'accepted') {
-                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.pickupLatLng.lat, trip.pickupLatLng.lng]], {
-                        color: '#f59e0b',
-                        weight: 2,
-                        dashArray: '4, 8'
-                    }).addTo(driverMap);
+                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.pickupLatLng.lat, trip.pickupLatLng.lng]], { color: '#f59e0b', weight: 2, dashArray: '4,8' }).addTo(driverMap);
                 } else if (trip.status === 'pickedUp') {
-                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {
-                        color: '#10b981',
-                        weight: 2,
-                        dashArray: '4, 8'
-                    }).addTo(driverMap);
+                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], { color: '#10b981', weight: 2, dashArray: '4,8' }).addTo(driverMap);
                 }
             }
         }
@@ -793,18 +764,19 @@
         driverData.currentLat = lat; driverData.currentLng = lng;
         await updateDoc(doc(db, "drivers", currentUser.uid), { currentLat: lat, currentLng: lng });
         driverMarker.setLatLng([lat, lng]); driverMap.setView([lat, lng], 13);
-        renderDriverTabs(); // refresh map
+        renderDriverTabs();
     }
 
     function renderDriverAvailableTab(container) {
         const pending = allRequests.filter(r => r.status === 'pending');
         if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No requests available</div>'; return; }
-        container.innerHTML = pending.map(req => `
-            <div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
-                <div><span class="font-medium">${req.type}</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
+        container.innerHTML = pending.map(req => {
+            const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
+                <div><span class="font-medium">${tripDisplay} (${req.type})</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
                 <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}">Accept</button>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
         document.querySelectorAll('.acceptReq').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const req = allRequests.find(r => r.id === btn.dataset.id);
@@ -833,9 +805,10 @@
         const trip = allRequests.find(r => r.id === activeId);
         if (!trip) { container.innerHTML = '<div class="text-center py-8 text-gray-400">Loading...</div>'; return; }
         const distToDropoff = trip.dropoffLatLng ? haversine(driverData.currentLat, driverData.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng) : 0;
+        const tripDisplay = trip.tripNumber ? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
         container.innerHTML = `
             <div class="space-y-3">
-                <div class="flex justify-between"><span class="font-semibold">#${trip.id.substring(0,6)}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
+                <div class="flex justify-between"><span class="font-semibold">${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
                 <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
                 <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
                 <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
@@ -846,12 +819,7 @@
                     <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
                     <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
                 </div>
-                <div class="mt-2">
-                    <details><summary>💬 Chat with customer</summary>
-                        <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
-                        <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
-                    </details>
-                </div>
+                <div class="mt-2"><details><summary>💬 Chat with customer</summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>
             </div>`;
         document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
         document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
@@ -877,15 +845,16 @@
     function renderDriverHistoryTab(container) {
         const my = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         if (!my.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No completed trips</div>'; return; }
-        container.innerHTML = my.map(r => `
-            <div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
+        container.innerHTML = my.map(r => {
+            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
                 <div>
-                    <span>#${r.id.substring(0,6)} ${r.type} – ${CURRENCY}${r.price}</span>
+                    <span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span>
                     <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
                 </div>
                 <span class="text-sm text-gray-400">${r.customerName}</span>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     // ---------- CHAT ----------
@@ -916,9 +885,7 @@
                 input.value = '';
             };
             sendBtn.onclick = newSend;
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') newSend();
-            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
         }
     }
 
@@ -947,15 +914,28 @@
                 <div class="card p-4 mb-4"><h3 class="font-semibold">📋 Requests</h3><button id="exportCSV" class="btn-primary text-sm px-3 py-1 mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-48 overflow-auto"></div></div>
                 <div class="card p-4"><h3 class="font-semibold">👤 User Management (demo)</h3><div id="userManagementList"></div></div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => {
-            dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
-        });
+        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
         document.getElementById('adminLogout').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
         new Chart(document.getElementById('requestsChart'), { type: 'line', data: { labels: Object.keys(byDay), datasets: [{ label: 'Requests', data: Object.values(byDay), borderColor: 'var(--primary)' }] } });
-        document.getElementById('adminRequestsList').innerHTML = allRequests.map(r => `<div class="border-b py-1 text-sm">#${r.id.substring(0,6)} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`).join('');
+        document.getElementById('adminRequestsList').innerHTML = allRequests.map(r => {
+            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+            return `<div class="border-b py-1 text-sm">${tripDisplay} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`;
+        }).join('');
         document.getElementById('exportCSV').onclick = () => {
-            const headers = ['ID','Type','Status','Price','Customer','Driver','Driver Car','Driver Plate','Payment','Created'];
-            const rows = allRequests.map(r => [r.id, r.type, r.status, r.price, r.customerName, r.driverName||'', r.driverCar||'', r.driverPlate||'', r.paymentMethod, r.createdAt?.toDate?.()?.toISOString()||'']);
+            const headers = ['Trip Number','ID','Type','Status','Price','Customer','Driver','Driver Car','Driver Plate','Payment','Created'];
+            const rows = allRequests.map(r => [
+                r.tripNumber || '',
+                r.id,
+                r.type,
+                r.status,
+                r.price,
+                r.customerName,
+                r.driverName||'',
+                r.driverCar||'',
+                r.driverPlate||'',
+                r.paymentMethod,
+                r.createdAt?.toDate?.()?.toISOString()||''
+            ]);
             const csv = [headers, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
             const blob = new Blob([csv], {type: 'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'logimove_requests.csv'; a.click();
