@@ -1,40 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>LogiMove Zambia</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>LogiMove Zambia – Food & Ride</title>
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Routing Machine -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <!-- Tailwind, Font Awesome, Chart.js, SweetAlert2 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        /* Theme & base (same as before) */
+        /* ----- Theme with high contrast (default dark) ----- */
         body {
             --primary: #4f46e5;
             --primary-light: #818cf8;
             --primary-dark: #4338ca;
-            --primary-bg: #eef2ff;
+            --primary-bg: #1e1b4b;
             --primary-hover: #4338ca;
             --primary-ring: rgba(79, 70, 229, 0.3);
-            --bg: #f6f9fc;
-            --card: white;
-            --text: #0f172a;
-            --border: #e2e8f0;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --border: #334155;
             background: var(--bg);
             color: var(--text);
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             transition: background 0.3s, color 0.3s;
         }
-        body.dark {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f1f5f9;
-            --border: #334155;
-            --primary-bg: #1e1b4b;
+        body.light {
+            --bg: #f6f9fc;
+            --card: white;
+            --text: #0f172a;
+            --border: #e2e8f0;
+            --primary-bg: #eef2ff;
         }
         .card { background: var(--card); border-color: var(--border); }
         .btn-primary { background: var(--primary); color: white; padding: 0.6rem 1.5rem; border-radius: 2rem; font-weight: 600; transition: background 0.2s; }
@@ -42,21 +47,11 @@
         .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary); }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
-        .map-container { height: 260px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
-        input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; }
-        input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
-        .fade-in { animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .spinner { border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin: 2rem auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .theme-dot { width: 24px; height: 24px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; }
-        .theme-dot:hover { border-color: var(--primary); }
-        .theme-dot.active { border-color: var(--text); }
-        body.dark input, body.dark select { background: #334155; border-color: #475569; color: white; }
-        .chat-message { padding: 4px 0; border-bottom: 1px solid var(--border); }
-        .chat-message .time { font-size: 0.6rem; color: var(--text); opacity: 0.5; margin-left: 8px; }
 
-        /* Clean location cards */
+        .map-container { height: 300px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
+        input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; color: var(--text); }
+        input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+
         .location-card-clean {
             padding: 0.5rem 1rem;
             border-radius: 1rem;
@@ -69,11 +64,11 @@
             background: var(--bg);
             min-height: 60px;
         }
-        .location-card-clean.active-pickup { border-color: #10b981; background: rgba(16, 185, 129, 0.08); }
-        .location-card-clean.active-dropoff { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+        .location-card-clean.active-pickup { border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
+        .location-card-clean.active-dropoff { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
         .location-card-clean .icon { font-size: 1.2rem; margin-right: 0.5rem; }
         .location-card-clean .info { flex: 1; }
-        .location-card-clean .label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; color: var(--text); opacity: 0.6; }
+        .location-card-clean .label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; opacity: 0.6; }
         .location-card-clean .address { font-weight: 500; font-size: 0.95rem; }
         .location-card-clean .actions { display: flex; gap: 0.5rem; }
         .location-card-clean .actions button { font-size: 0.7rem; padding: 0.2rem 0.8rem; border-radius: 2rem; border: none; cursor: pointer; }
@@ -83,14 +78,6 @@
         .saved-place-item { background: var(--primary-bg); color: var(--text); padding: 0.2rem 1rem; border-radius: 2rem; font-size: 0.8rem; cursor: pointer; display: inline-block; margin: 2px; }
         .saved-place-item:hover { background: var(--primary-light); }
 
-        .progress-step { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
-        .progress-step .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
-        .progress-step .dot.active { background: var(--primary); }
-        .progress-step .dot.done { background: #10b981; }
-        .progress-line { flex: 1; height: 2px; background: var(--border); }
-        .progress-line.done { background: #10b981; }
-
-        /* Chat badge */
         .chat-badge {
             background: #ef4444;
             color: white;
@@ -101,15 +88,27 @@
             margin-left: 4px;
         }
 
+        .restaurant-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 0.75rem;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .restaurant-card:hover { transform: scale(1.02); border-color: var(--primary); }
+        .menu-item { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+        .cart-item { display: flex; justify-content: space-between; padding: 0.4rem 0; }
+
         @media (max-width: 640px) {
-            .location-card-clean { flex-wrap: wrap; min-height: 50px; }
+            .location-card-clean { flex-wrap: wrap; }
             .location-card-clean .actions { margin-top: 4px; width: 100%; justify-content: flex-end; }
             .map-container { height: 200px; }
         }
     </style>
 </head>
 <body>
-<div id="appContainer" class="max-w-6xl mx-auto p-3 md:p-6"></div>
+<div id="appContainer" class="max-w-7xl mx-auto p-3 md:p-6"></div>
 
 <script type="module">
     // ---------- FIREBASE IMPORTS ----------
@@ -142,182 +141,117 @@
     let savedPlaces = [];
     let recentPlaces = [];
     let allRequests = [];
+    let allRestaurants = [];
+    let foodCart = [];
     let unsubscribeRequests = null;
     let driverData = { currentLat: -15.3875, currentLng: 28.3228, status: "online", activeRequestId: null, carModel: '', plate: '', phone: '' };
     let mapSelectMode = "pickup";
     let fcmToken = null;
     let chatUnsub = null;
-    let activeTab = 'map';
-    let customerRouteLine = null;
-    let driverPosUnsub = null;
-    let driverMarkerCust = null;
-    let chatBadgeUnsub = null;
-    let currentChatId = null;
+    let activeTab = 'map'; // customer: map, food, requests, history
+    let activeFoodRestaurant = null;
+    let routingControl = null;
 
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
     const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
 
     // ---------- HELPERS ----------
-    function formatDate(timestamp) {
-        if (!timestamp) return 'Unknown date';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) +
-               ', ' + date.toLocaleTimeString('en-ZM', { hour: '2-digit', minute: '2-digit' });
-    }
+    function formatDate(t) { if (!t) return 'Unknown'; const d = t.toDate ? t.toDate() : new Date(t); return d.toLocaleDateString('en-ZM',{day:'2-digit',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('en-ZM',{hour:'2-digit',minute:'2-digit'}); }
+    function formatTime(t) { if (!t) return ''; const d = t.toDate ? t.toDate() : new Date(t); return d.toLocaleTimeString('en-ZM',{hour:'2-digit',minute:'2-digit'}); }
+    function haversine(lat1,lng1,lat2,lng2) { const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLng=(lng2-lng1)*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
+    function estimateTime(dist) { const min=Math.round((dist/30)*60); if(min<1) return '1 min'; if(min<60) return min+' min'; const h=Math.floor(min/60); const m=min%60; return h+'h '+m+'min'; }
+    function autoPrice() { if(!tempPickup||!tempDropoff) return 0; const dist=haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng); let price=RATES[serviceType].base+dist*RATES[serviceType].perKm; const rounded=Math.round(price*2)/2; const pInput=document.getElementById('priceInput'); if(pInput) pInput.value=rounded; const dSpan=document.getElementById('distanceDisplay'); if(dSpan) dSpan.innerText=dist.toFixed(2)+' km'; const eSpan=document.getElementById('etaDisplay'); if(eSpan) eSpan.innerText=estimateTime(dist); const aSpan=document.getElementById('autoPriceDisplay'); if(aSpan) aSpan.innerText=`${CURRENCY}${rounded}`; const bSpan=document.getElementById('fareBreakdown'); if(bSpan) bSpan.innerText=`Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${rounded}`; return rounded; }
 
-    function formatTime(timestamp) {
-        if (!timestamp) return '';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleTimeString('en-ZM', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function haversine(lat1, lng1, lat2, lng2) {
-        const R = 6371;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    }
-
-    function estimateTime(distanceKm) {
-        const speedKmh = 30;
-        const minutes = Math.round((distanceKm / speedKmh) * 60);
-        if (minutes < 1) return '1 min';
-        if (minutes < 60) return minutes + ' min';
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return hours + 'h ' + mins + 'min';
-    }
-
-    function autoPrice() {
-        if (!tempPickup || !tempDropoff) return 0;
-        const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
-        let price = RATES[serviceType].base + dist * RATES[serviceType].perKm;
-        const rounded = Math.round(price * 2) / 2;
-        const pInput = document.getElementById('priceInput');
-        if (pInput) pInput.value = rounded;
-        const dSpan = document.getElementById('distanceDisplay');
-        if (dSpan) {
-            dSpan.innerText = dist.toFixed(2) + " km";
-            const etaSpan = document.getElementById('etaDisplay');
-            if (etaSpan) etaSpan.innerText = estimateTime(dist);
-        }
-        const aSpan = document.getElementById('autoPriceDisplay');
-        if (aSpan) aSpan.innerText = `${CURRENCY}${rounded}`;
-        const bSpan = document.getElementById('fareBreakdown');
-        if (bSpan) bSpan.innerText = `Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${rounded}`;
-        return rounded;
-    }
-
-    async function initNotifications() {
-        if (fcmToken) return;
-        try {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return;
-            const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-            if (token && currentUser) await setDoc(doc(db, "fcmTokens", currentUser.uid), { token, role: currentRole }, { merge: true });
-            fcmToken = token;
-        } catch(e) { console.warn("FCM error", e); }
-    }
-
-    function showNotification(title, body) {
-        if (Notification.permission === 'granted') new Notification(title, { body });
-        else Swal.fire({ title, text: body, icon: 'info', toast: true, position: 'top-end', timer: 3000 });
-    }
-    onMessage(messaging, (p) => showNotification(p.notification.title, p.notification.body));
-
-    function haptic() {
-        if (navigator.vibrate) navigator.vibrate(10);
-    }
+    async function initNotifications(){ if(fcmToken) return; try{const p=await Notification.requestPermission(); if(p!=='granted') return; const token=await getToken(messaging,{vapidKey:VAPID_KEY}); if(token&&currentUser) await setDoc(doc(db,"fcmTokens",currentUser.uid),{token,role:currentRole},{merge:true}); fcmToken=token;}catch(e){console.warn("FCM error",e);} }
+    function showNotification(title,body){ if(Notification.permission==='granted') new Notification(title,{body}); else Swal.fire({title,text:body,icon:'info',toast:true,position:'top-end',timer:3000}); }
+    onMessage(messaging,(p)=>showNotification(p.notification.title,p.notification.body));
+    function haptic(){ if(navigator.vibrate) navigator.vibrate(10); }
 
     // ---------- RATINGS ----------
     async function rateDriver(reqId, driverId, rating, comment) {
-        await setDoc(doc(db, "ratings", reqId), { driverId, rating, comment, timestamp: serverTimestamp(), requestId: reqId });
-        const snap = await getDocs(query(collection(db, "ratings"), where("driverId", "==", driverId)));
+        await setDoc(doc(db,"ratings",reqId),{driverId,rating,comment,timestamp:serverTimestamp(),requestId:reqId});
+        const snap=await getDocs(query(collection(db,"ratings"),where("driverId","==",driverId)));
         let total=0,count=0; snap.forEach(d=>{total+=d.data().rating; count++;});
-        await updateDoc(doc(db, "drivers", driverId), { averageRating: total/count, ratingsCount: count });
-        Swal.fire({ title: 'Thanks!', icon: 'success', timer: 1500, showConfirmButton: false });
+        await updateDoc(doc(db,"drivers",driverId),{averageRating:total/count,ratingsCount:count});
+        Swal.fire({title:'Thanks!',icon:'success',timer:1500,showConfirmButton:false});
     }
 
     // ---------- AUTH ----------
-    async function saveUserToFirestore(user, role, name, extra = {}) {
-        await setDoc(doc(db, "users", user.uid), { email: user.email, name, role, createdAt: serverTimestamp() });
-        if (role === 'driver') {
-            await setDoc(doc(db, "drivers", user.uid), {
-                currentLat: -15.3875, currentLng: 28.3228,
-                status: "online", activeRequestId: null,
-                averageRating: 0, ratingsCount: 0,
-                phone: extra.phone || '',
-                carModel: extra.carModel || '',
-                plate: extra.plate || ''
+    async function saveUserToFirestore(user, role, name, extra={}) {
+        await setDoc(doc(db,"users",user.uid),{email:user.email,name,role,createdAt:serverTimestamp()});
+        if(role==='driver') {
+            await setDoc(doc(db,"drivers",user.uid),{
+                currentLat:-15.3875,currentLng:28.3228,
+                status:"online",activeRequestId:null,
+                averageRating:0,ratingsCount:0,
+                phone:extra.phone||'',
+                carModel:extra.carModel||'',
+                plate:extra.plate||''
             });
         }
     }
 
     async function loadUserData(uid) {
-        const userSnap = await getDoc(doc(db, "users", uid));
-        if (userSnap.exists()) currentRole = userSnap.data().role;
-        if (currentRole === "driver") {
-            const drvSnap = await getDoc(doc(db, "drivers", uid));
-            if (drvSnap.exists()) driverData = drvSnap.data();
-            else await setDoc(doc(db, "drivers", uid), driverData);
+        const userSnap=await getDoc(doc(db,"users",uid));
+        if(userSnap.exists()) currentRole=userSnap.data().role;
+        if(currentRole==='driver') {
+            const drvSnap=await getDoc(doc(db,"drivers",uid));
+            if(drvSnap.exists()) driverData=drvSnap.data();
+            else await setDoc(doc(db,"drivers",uid),driverData);
         }
-        const savedSnap = await getDoc(doc(db, "savedPlaces", uid));
-        savedPlaces = savedSnap.exists() ? savedSnap.data().places || [] : [];
-        const recentSnap = await getDoc(doc(db, "recentPlaces", uid));
-        recentPlaces = recentSnap.exists() ? recentSnap.data().places || [] : [];
+        const savedSnap=await getDoc(doc(db,"savedPlaces",uid));
+        savedPlaces=savedSnap.exists()?savedSnap.data().places||[]:[];
+        const recentSnap=await getDoc(doc(db,"recentPlaces",uid));
+        recentPlaces=recentSnap.exists()?recentSnap.data().places||[]:[];
     }
 
     function listenRequests() {
-        if (unsubscribeRequests) unsubscribeRequests();
-        const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
-        unsubscribeRequests = onSnapshot(q, (snap) => {
-            allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            if (currentRole === "customer") renderCustomerTabs();
-            else if (currentRole === "driver") renderDriverTabs();
-            else if (currentRole === "admin") renderAdminPanel();
+        if(unsubscribeRequests) unsubscribeRequests();
+        const q=query(collection(db,"requests"),orderBy("createdAt","desc"));
+        unsubscribeRequests=onSnapshot(q,(snap)=>{
+            allRequests=snap.docs.map(d=>({id:d.id,...d.data()}));
+            if(currentRole==='customer') renderCustomerTabs();
+            else if(currentRole==='driver') renderDriverTabs();
+            else if(currentRole==='admin') renderAdminPanel();
         });
     }
 
     // ---------- THEME ----------
-    const themes = [
-        { name: 'Indigo', primary: '#4f46e5', light: '#818cf8', dark: '#4338ca', bg: '#eef2ff' },
-        { name: 'Blue', primary: '#3b82f6', light: '#60a5fa', dark: '#2563eb', bg: '#eff6ff' },
-        { name: 'Green', primary: '#10b981', light: '#34d399', dark: '#059669', bg: '#ecfdf5' },
-        { name: 'Orange', primary: '#f97316', light: '#fb923c', dark: '#ea580c', bg: '#fff7ed' },
-        { name: 'Purple', primary: '#8b5cf6', light: '#a78bfa', dark: '#7c3aed', bg: '#f5f3ff' },
-        { name: 'Red', primary: '#ef4444', light: '#f87171', dark: '#dc2626', bg: '#fef2f2' },
-        { name: 'Teal', primary: '#14b8a6', light: '#2dd4bf', dark: '#0d9488', bg: '#f0fdfa' }
+    const themes=[
+        {name:'Indigo',primary:'#4f46e5',light:'#818cf8',dark:'#4338ca',bg:'#1e1b4b'},
+        {name:'Blue',primary:'#3b82f6',light:'#60a5fa',dark:'#2563eb',bg:'#1e293b'},
+        {name:'Green',primary:'#10b981',light:'#34d399',dark:'#059669',bg:'#064e3b'},
+        {name:'Orange',primary:'#f97316',light:'#fb923c',dark:'#ea580c',bg:'#431407'},
+        {name:'Purple',primary:'#8b5cf6',light:'#a78bfa',dark:'#7c3aed',bg:'#2e1065'},
+        {name:'Red',primary:'#ef4444',light:'#f87171',dark:'#dc2626',bg:'#450a0a'},
+        {name:'Teal',primary:'#14b8a6',light:'#2dd4bf',dark:'#0d9488',bg:'#042f2e'}
     ];
-    let currentTheme = localStorage.getItem('theme') || 'Indigo';
-    function applyTheme(themeName) {
-        const theme = themes.find(t => t.name === themeName);
-        if (!theme) return;
-        document.documentElement.style.setProperty('--primary', theme.primary);
-        document.documentElement.style.setProperty('--primary-light', theme.light);
-        document.documentElement.style.setProperty('--primary-dark', theme.dark);
-        document.documentElement.style.setProperty('--primary-bg', theme.bg);
-        document.documentElement.style.setProperty('--primary-hover', theme.dark);
-        document.documentElement.style.setProperty('--primary-ring', theme.primary + '40');
-        localStorage.setItem('theme', themeName);
-        currentTheme = themeName;
-        document.querySelectorAll('.theme-dot').forEach(d => {
-            d.classList.toggle('active', d.dataset.theme === themeName);
-        });
+    let currentTheme=localStorage.getItem('theme')||'Indigo';
+    function applyTheme(name){
+        const t=themes.find(x=>x.name===name); if(!t) return;
+        document.documentElement.style.setProperty('--primary',t.primary);
+        document.documentElement.style.setProperty('--primary-light',t.light);
+        document.documentElement.style.setProperty('--primary-dark',t.dark);
+        document.documentElement.style.setProperty('--primary-bg',t.bg);
+        document.documentElement.style.setProperty('--primary-hover',t.dark);
+        document.documentElement.style.setProperty('--primary-ring',t.primary+'40');
+        localStorage.setItem('theme',name);
+        currentTheme=name;
+        document.querySelectorAll('.theme-dot').forEach(d=>d.classList.toggle('active',d.dataset.theme===name));
     }
     applyTheme(currentTheme);
 
     // ---------- LOGIN ----------
     function renderLogin() {
-        document.getElementById('appContainer').innerHTML = `
+        document.getElementById('appContainer').innerHTML=`
             <div class="min-h-screen flex items-center justify-center p-4">
                 <div class="card max-w-md w-full text-center p-6 rounded-2xl shadow" style="background:var(--card);">
                     <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style="background:var(--primary-bg);">
                         <i class="fas fa-truck-fast text-4xl" style="color:var(--primary);"></i>
                     </div>
                     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Move</span></h1>
-                    <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Delivery & Taxi</p>
+                    <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Ride • Delivery • Food</p>
                     <input type="email" id="loginEmail" placeholder="Email" class="mb-3">
                     <input type="password" id="loginPassword" placeholder="Password" class="mb-3">
                     <button id="loginBtn" class="btn-primary w-full">Login</button>
@@ -335,67 +269,53 @@
                         <input type="text" id="drvFullName" placeholder="Full name">
                         <input type="email" id="drvEmail" placeholder="Email">
                         <input type="password" id="drvPwd" placeholder="Password">
-                        <input type="tel" id="drvPhone" placeholder="Phone number (e.g. 0977...)">
-                        <input type="text" id="drvCarModel" placeholder="Car model (e.g. Toyota Corolla)">
-                        <input type="text" id="drvPlate" placeholder="Licence plate number">
+                        <input type="tel" id="drvPhone" placeholder="Phone (e.g. 0977...)">
+                        <input type="text" id="drvCarModel" placeholder="Car model">
+                        <input type="text" id="drvPlate" placeholder="Licence plate">
                         <button id="doDriverReg" class="btn-primary w-full" style="background:var(--primary);">Register as Driver</button>
                     </div>
                     <div class="mt-4 flex justify-center gap-2 text-xs">
-                        <button id="darkToggle" class="underline">🌓 Dark Mode</button>
+                        <button id="darkToggle" class="underline">☀️ Light Mode</button>
                         <span>|</span>
                         <details class="inline-block">
                             <summary class="cursor-pointer text-xs underline">🎨 Theme</summary>
                             <div class="absolute bg-white dark:bg-gray-800 shadow rounded p-2 mt-1 flex flex-wrap gap-1" style="z-index:10; right:0;">
-                                ${themes.map(t => `<div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>`).join('')}
+                                ${themes.map(t=>`<div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>`).join('')}
                             </div>
                         </details>
                     </div>
                 </div>
             </div>`;
-        document.getElementById('loginBtn').onclick = async () => {
-            try {
-                const cred = await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value.trim(), document.getElementById('loginPassword').value);
-                currentUser = cred.user; await loadUserData(currentUser.uid); await initNotifications(); startApp();
-            } catch(e) { Swal.fire('Error', e.message, 'error'); }
+        document.getElementById('loginBtn').onclick=async()=>{
+            try{const cred=await signInWithEmailAndPassword(auth,document.getElementById('loginEmail').value.trim(),document.getElementById('loginPassword').value); currentUser=cred.user; await loadUserData(currentUser.uid); await initNotifications(); startApp();}catch(e){Swal.fire('Error',e.message,'error');}
         };
-        document.getElementById('showCustomerReg').onclick = () => { document.getElementById('customerRegForm').classList.remove('hidden'); document.getElementById('driverRegForm').classList.add('hidden'); };
-        document.getElementById('showDriverReg').onclick = () => { document.getElementById('driverRegForm').classList.remove('hidden'); document.getElementById('customerRegForm').classList.add('hidden'); };
-        document.getElementById('doCustomerReg').onclick = async () => {
-            const name = document.getElementById('custName').value.trim(), email = document.getElementById('custEmail').value.trim(), pwd = document.getElementById('custPwd').value;
-            if (!name || !email || !pwd) return Swal.fire('All fields required');
-            try { const cred = await createUserWithEmailAndPassword(auth, email, pwd); await saveUserToFirestore(cred.user, 'customer', name); currentUser = cred.user; await loadUserData(currentUser.uid); await initNotifications(); startApp(); }
-            catch(e) { Swal.fire('Error', e.message, 'error'); }
+        document.getElementById('showCustomerReg').onclick=()=>{document.getElementById('customerRegForm').classList.remove('hidden'); document.getElementById('driverRegForm').classList.add('hidden');};
+        document.getElementById('showDriverReg').onclick=()=>{document.getElementById('driverRegForm').classList.remove('hidden'); document.getElementById('customerRegForm').classList.add('hidden');};
+        document.getElementById('doCustomerReg').onclick=async()=>{
+            const name=document.getElementById('custName').value.trim(), email=document.getElementById('custEmail').value.trim(), pwd=document.getElementById('custPwd').value;
+            if(!name||!email||!pwd) return Swal.fire('All fields required');
+            try{const cred=await createUserWithEmailAndPassword(auth,email,pwd); await saveUserToFirestore(cred.user,'customer',name); currentUser=cred.user; await loadUserData(currentUser.uid); await initNotifications(); startApp();}catch(e){Swal.fire('Error',e.message,'error');}
         };
-        document.getElementById('doDriverReg').onclick = async () => {
-            const name = document.getElementById('drvFullName').value.trim();
-            const email = document.getElementById('drvEmail').value.trim();
-            const pwd = document.getElementById('drvPwd').value;
-            const phone = document.getElementById('drvPhone').value.trim();
-            const carModel = document.getElementById('drvCarModel').value.trim();
-            const plate = document.getElementById('drvPlate').value.trim();
-            if (!name || !email || !pwd || !phone || !carModel || !plate) return Swal.fire('All fields required');
-            try {
-                const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-                await saveUserToFirestore(cred.user, 'driver', name, { phone, carModel, plate });
-                currentUser = cred.user;
-                await loadUserData(currentUser.uid);
-                await initNotifications();
-                startApp();
-            } catch(e) { Swal.fire('Error', e.message, 'error'); }
+        document.getElementById('doDriverReg').onclick=async()=>{
+            const name=document.getElementById('drvFullName').value.trim();
+            const email=document.getElementById('drvEmail').value.trim();
+            const pwd=document.getElementById('drvPwd').value;
+            const phone=document.getElementById('drvPhone').value.trim();
+            const carModel=document.getElementById('drvCarModel').value.trim();
+            const plate=document.getElementById('drvPlate').value.trim();
+            if(!name||!email||!pwd||!phone||!carModel||!plate) return Swal.fire('All fields required');
+            try{const cred=await createUserWithEmailAndPassword(auth,email,pwd); await saveUserToFirestore(cred.user,'driver',name,{phone,carModel,plate}); currentUser=cred.user; await loadUserData(currentUser.uid); await initNotifications(); startApp();}catch(e){Swal.fire('Error',e.message,'error');}
         };
-        document.getElementById('darkToggle').onclick = toggleDark;
-        document.querySelectorAll('.theme-dot').forEach(dot => {
-            dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
-        });
+        document.getElementById('darkToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light'));};
+        if(localStorage.getItem('lightMode')==='true') document.body.classList.add('light');
+        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
     }
 
-    function toggleDark() { document.body.classList.toggle('dark'); localStorage.setItem('dark', document.body.classList.contains('dark')); }
-    if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
-
+    // ---------- START ----------
     function startApp() {
         listenRequests();
-        if (currentUser.email === 'admin@logimove.com') { currentRole = 'admin'; renderAdminPanel(); }
-        else if (currentRole === 'customer') renderCustomerTabs();
+        if(currentUser.email==='admin@logimove.com'){currentRole='admin'; renderAdminPanel();}
+        else if(currentRole==='customer') renderCustomerTabs();
         else renderDriverTabs();
     }
 
@@ -409,317 +329,590 @@
                     <details class="relative">
                         <summary class="cursor-pointer text-sm bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full">🎨</summary>
                         <div class="absolute right-0 mt-1 bg-white dark:bg-gray-800 shadow rounded p-2 flex flex-wrap gap-1" style="z-index:20; min-width:120px;">
-                            ${themes.map(t => `<div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>`).join('')}
+                            ${themes.map(t=>`<div class="theme-dot ${t.name===currentTheme?'active':''}" data-theme="${t.name}" style="background:${t.primary};" title="${t.name}"></div>`).join('')}
                         </div>
                     </details>
-                    <button onclick="toggleDark()" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm">🌓</button>
+                    <button id="modeToggle" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm">${document.body.classList.contains('light')?'🌙':'☀️'}</button>
                     <button id="${logoutId}" class="text-red-500 text-sm font-medium">Logout</button>
                 </div>
             </div>`;
     }
 
-    // ---------- CUSTOMER TABS ----------
+    // ============================================================
+    // =============== CUSTOMER DASHBOARD =========================
+    // ============================================================
     function renderCustomerTabs() {
         document.getElementById('appContainer').innerHTML = `
             <div class="fade-in">
                 ${renderHeader(`👤 ${currentUser.email}`, 'logoutBtn')}
                 <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='map'?'tab-active':''}" data-tab="map">📍 Where to?</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='food'?'tab-active':''}" data-tab="food">🍔 Food</button>
                     <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 My trip</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 Past trips</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
                 </div>
                 <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { activeTab = btn.dataset.tab; renderCustomerTabs(); }));
-        document.getElementById('logoutBtn').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
-        document.getElementById('refreshBtn').onclick = () => { listenRequests(); Swal.fire({ title: 'Refreshed!', icon: 'success', timer: 800, showConfirmButton: false }); };
-        const content = document.getElementById('tabContent');
-        if (activeTab === 'map') renderCustomerMapTab(content);
-        else if (activeTab === 'requests') renderCustomerActiveTab(content);
-        else if (activeTab === 'history') renderCustomerHistoryTab(content);
+        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
+        document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{ activeTab=btn.dataset.tab; renderCustomerTabs(); }));
+        document.getElementById('logoutBtn').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
+        document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
+        document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
+        const content=document.getElementById('tabContent');
+        if(activeTab==='map') renderCustomerMapTab(content);
+        else if(activeTab==='food') renderCustomerFoodTab(content);
+        else if(activeTab==='requests') renderCustomerActiveTab(content);
+        else if(activeTab==='history') renderCustomerHistoryTab(content);
     }
 
-    // ================================================================
-    // ============== CUSTOMER MAP TAB (clean layout) ==============
-    // ================================================================
+    // ----- CUSTOMER MAP TAB (rides/delivery) -----
     function renderCustomerMapTab(container) {
         const html = `
             <div class="space-y-3">
-                <!-- Service Type -->
                 <div class="flex gap-2 flex-wrap">
                     <button id="serviceDelivery" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='delivery'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button>
                     <button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button>
                 </div>
-
-                <!-- Search -->
                 <div class="relative">
                     <input type="text" id="searchInput" placeholder="Where to?" class="pr-10">
                     <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
                     <div id="searchResults" class="absolute bg-white dark:bg-gray-800 border rounded-xl hidden z-10 w-full max-h-48 overflow-auto"></div>
                 </div>
-
-                <!-- Action buttons -->
                 <div class="flex flex-wrap gap-2">
-                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 Use my current location</button>
-                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save this place</button>
-                    <button id="clearAllBtn" class="text-xs bg-red-100 dark:bg-red-900 px-3 py-1 rounded-full text-red-600">🗑️ Clear all</button>
+                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
+                    <button id="clearAllBtn" class="text-xs bg-red-100 dark:bg-red-900 px-3 py-1 rounded-full text-red-600">🗑️ Clear</button>
                 </div>
-
-                <!-- Saved & Recent -->
                 <div id="savedPlacesContainer">
                     <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
                     <div id="recentPlacesList" class="flex flex-wrap gap-1 mt-1"></div>
                 </div>
-
-                <!-- Two clean location cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <!-- Pickup card -->
                     <div id="pickupCard" class="location-card-clean ${mapSelectMode==='pickup'?'active-pickup':''}">
                         <div class="icon">📍</div>
-                        <div class="info">
-                            <div class="label">Pickup</div>
-                            <div id="pickupAddress" class="address">Not set</div>
-                        </div>
-                        <div class="actions">
-                            <button id="setPickupBtn" class="set-btn">Set</button>
-                            <button id="clearPickup" class="clear-btn">✕</button>
-                        </div>
+                        <div class="info"><div class="label">Pickup</div><div id="pickupAddress" class="address">Not set</div></div>
+                        <div class="actions"><button id="setPickupBtn" class="set-btn">Set</button><button id="clearPickup" class="clear-btn">✕</button></div>
                     </div>
-                    <!-- Dropoff card -->
                     <div id="dropoffCard" class="location-card-clean ${mapSelectMode==='dropoff'?'active-dropoff':''}">
                         <div class="icon">🏁</div>
-                        <div class="info">
-                            <div class="label">Dropoff</div>
-                            <div id="dropoffAddress" class="address">Not set</div>
-                        </div>
-                        <div class="actions">
-                            <button id="setDropoffBtn" class="set-btn">Set</button>
-                            <button id="clearDropoff" class="clear-btn">✕</button>
-                        </div>
+                        <div class="info"><div class="label">Dropoff</div><div id="dropoffAddress" class="address">Not set</div></div>
+                        <div class="actions"><button id="setDropoffBtn" class="set-btn">Set</button><button id="clearDropoff" class="clear-btn">✕</button></div>
                     </div>
                 </div>
-
-                <!-- Map -->
                 <div id="customerMap" class="map-container"></div>
-
-                <!-- Price & Route -->
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
                     <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
-                    <div class="flex justify-between"><span>💰 Price estimate</span><span id="autoPriceDisplay">—</span></div>
-                    <div id="fareBreakdown" class="text-xs text-gray-500 dark:text-gray-300"></div>
+                    <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
+                    <div id="fareBreakdown" class="text-xs"></div>
                 </div>
-
-                <!-- Cargo & Payment -->
                 <div class="grid grid-cols-2 gap-2">
                     <select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select>
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full">Request a ride / delivery</button>
-                <div class="text-xs text-gray-400 text-center">Click the map or search to set a location</div>
+                <button id="publishBtn" class="btn-primary w-full">Request ride / delivery</button>
             </div>`;
         container.innerHTML = html;
+        // ---- attach events ----
+        document.getElementById('pickupCard').addEventListener('click',()=>setActiveMode('pickup'));
+        document.getElementById('dropoffCard').addEventListener('click',()=>setActiveMode('dropoff'));
+        document.getElementById('setPickupBtn').addEventListener('click',(e)=>{e.stopPropagation(); if(window.lastSearchResult) setLocationForActiveMode(window.lastSearchResult,window.lastSearchResult.display_name); else Swal.fire('Search first');});
+        document.getElementById('setDropoffBtn').addEventListener('click',(e)=>{e.stopPropagation(); if(window.lastSearchResult) setLocationForActiveMode(window.lastSearchResult,window.lastSearchResult.display_name); else Swal.fire('Search first');});
+        document.getElementById('clearPickup').addEventListener('click',(e)=>{e.stopPropagation(); tempPickup=null; tempPickupAddress=null; updateLocationUI(); autoPrice(); if(pickupMarker&&window.customerMap){window.customerMap.removeLayer(pickupMarker); pickupMarker=null;} drawCustomerRoute();});
+        document.getElementById('clearDropoff').addEventListener('click',(e)=>{e.stopPropagation(); tempDropoff=null; tempDropoffAddress=null; updateLocationUI(); autoPrice(); if(dropoffMarker&&window.customerMap){window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null;} drawCustomerRoute();});
+        document.getElementById('clearAllBtn').addEventListener('click',()=>{tempPickup=null;tempPickupAddress=null;tempDropoff=null;tempDropoffAddress=null; updateLocationUI(); autoPrice(); if(pickupMarker&&window.customerMap){window.customerMap.removeLayer(pickupMarker); pickupMarker=null;} if(dropoffMarker&&window.customerMap){window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null;} drawCustomerRoute(); Swal.fire({title:'Cleared',icon:'info',timer:800});});
+        document.getElementById('useMyLocation').addEventListener('click',()=>{haptic(); if(navigator.geolocation){Swal.fire({title:'Getting location...',timer:2000,didOpen:()=>Swal.showLoading()}); navigator.geolocation.getCurrentPosition(pos=>{const ll={lat:pos.coords.latitude,lng:pos.coords.longitude}; setLocationForActiveMode(ll,'📍 My location'); if(window.customerMap) window.customerMap.setView([pos.coords.latitude,pos.coords.longitude],14); Swal.close();},()=>{Swal.fire('Error','Could not get location','error');});} else Swal.fire('Error','Geolocation not supported','error');});
+        document.getElementById('saveLocationBtn').addEventListener('click',async()=>{haptic(); const loc=mapSelectMode==='pickup'?tempPickup:tempDropoff; const addr=mapSelectMode==='pickup'?tempPickupAddress:tempDropoffAddress; if(!loc) return Swal.fire('No location to save'); const {value:name}=await Swal.fire({title:'Save this place',input:'text',inputLabel:'Name',inputPlaceholder:'Home, Work...',showCancelButton:true}); if(!name) return; savedPlaces.push({name,lat:loc.lat,lng:loc.lng,address:addr||'Point'}); await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces}); renderSavedPlaces(); Swal.fire({title:'Saved!',icon:'success',timer:1000});});
+        document.getElementById('serviceDelivery').onclick=()=>{serviceType='delivery'; renderCustomerTabs();};
+        document.getElementById('serviceTaxi').onclick=()=>{serviceType='taxi'; renderCustomerTabs();};
+        document.getElementById('publishBtn').onclick=async()=>{haptic(); if(!tempPickup||!tempDropoff) return Swal.fire('Error','Set both pickup and dropoff','warning'); if(tempPickup.lat===tempDropoff.lat&&tempPickup.lng===tempDropoff.lng) return Swal.fire('Same location'); let price=parseFloat(document.getElementById('priceInput').value); if(isNaN(price)) price=autoPrice()||0; if(price<=0) return Swal.fire('Invalid price'); const detail=document.getElementById('cargoSelect').value; const payment=document.getElementById('paymentSelect').value; try{const counterRef=doc(db,"counters","requests"); let tripNumber=1; await runTransaction(db,async(transaction)=>{const counterDoc=await transaction.get(counterRef); if(counterDoc.exists()) tripNumber=counterDoc.data().current+1; transaction.set(counterRef,{current:tripNumber});}); const req={customerId:currentUser.uid,customerName:currentUser.email,type:serviceType,cargoDetail:detail,price,paymentMethod:payment,status:'pending',driverId:null,driverName:null,driverCar:'',driverPlate:'',pickupLatLng:{lat:tempPickup.lat,lng:tempPickup.lng},dropoffLatLng:{lat:tempDropoff.lat,lng:tempDropoff.lng},pickupAddress:tempPickupAddress||'Pickup',dropoffAddress:tempDropoffAddress||'Dropoff',createdAt:serverTimestamp(),tripNumber:tripNumber}; await addDoc(collection(db,"requests"),req); const recentLoc={lat:tempPickup.lat,lng:tempPickup.lng,address:tempPickupAddress}; recentPlaces=[recentLoc,...recentPlaces.filter(p=>p.lat!==recentLoc.lat||p.lng!==recentLoc.lng)].slice(0,5); await setDoc(doc(db,"recentPlaces",currentUser.uid),{places:recentPlaces}); Swal.fire({title:'Request sent!',icon:'success',timer:2000}); showNotification('New request','Drivers can see it'); tempPickup=null;tempPickupAddress=null;tempDropoff=null;tempDropoffAddress=null; updateLocationUI(); autoPrice(); if(pickupMarker&&window.customerMap){window.customerMap.removeLayer(pickupMarker); pickupMarker=null;} if(dropoffMarker&&window.customerMap){window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null;} drawCustomerRoute();}catch(e){Swal.fire('Error',e.message,'error');}};
+        // search
+        const searchInput=document.getElementById('searchInput'), resultsDiv=document.getElementById('searchResults'); let timeout;
+        searchInput.addEventListener('input',()=>{clearTimeout(timeout); const q=searchInput.value; if(q.length<3){resultsDiv.classList.add('hidden'); return;} timeout=setTimeout(async()=>{const res=await searchAddress(q); if(!res.length){resultsDiv.classList.add('hidden'); return;} resultsDiv.innerHTML=res.map(r=>`<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,60)}</div>`).join(''); resultsDiv.classList.remove('hidden'); document.querySelectorAll('.autocomplete-item').forEach(el=>{el.addEventListener('click',()=>{const lat=parseFloat(el.dataset.lat),lng=parseFloat(el.dataset.lng),name=el.dataset.name; window.lastSearchResult={lat,lng,display_name:name}; setLocationForActiveMode({lat,lng},name); searchInput.value=name; resultsDiv.classList.add('hidden');});});},400);});
+        document.addEventListener('click',(e)=>{if(!searchInput.contains(e.target)&&!resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden');});
+        renderSavedPlaces(); renderRecentPlaces(); initCustomerMap(); updateLocationUI(); if(tempPickup&&tempDropoff) autoPrice();
+    }
 
-        // --- Attach events ---
-        // Click card to set active mode
-        document.getElementById('pickupCard').addEventListener('click', () => setActiveMode('pickup'));
-        document.getElementById('dropoffCard').addEventListener('click', () => setActiveMode('dropoff'));
-
-        // Set buttons
-        document.getElementById('setPickupBtn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (window.lastSearchResult) {
-                setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
-            } else if (tempPickup) {
-                // already set
+    // ----- CUSTOMER FOOD TAB -----
+    function renderCustomerFoodTab(container) {
+        // Load restaurants from Firestore or seed default
+        const loadRestaurants = async () => {
+            const snap = await getDocs(collection(db, "restaurants"));
+            if (!snap.empty) {
+                allRestaurants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             } else {
-                Swal.fire('Search first', 'Type an address and select a result', 'info');
+                // Seed default restaurants
+                const defaultRestaurants = [
+                    { name: "KFC", logo: "🍗", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Zinger Burger", price:35},{name:"Fries", price:15},{name:"Coke", price:8}] },
+                    { name: "Hungry Lion", logo: "🐔", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Chicken Meal", price:40},{name:"Chips", price:12},{name:"Milkshake", price:18}] },
+                    { name: "Shoprite", logo: "🛒", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Grocery pack", price:50},{name:"Bread", price:7},{name:"Milk", price:12}] },
+                    { name: "Pick n Pay", logo: "🛍️", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Fruit Basket", price:30},{name:"Juice", price:10},{name:"Snacks", price:15}] },
+                    { name: "Game", logo: "🎮", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Electronics", price:200},{name:"Household", price:45},{name:"Toys", price:25}] }
+                ];
+                for (const r of defaultRestaurants) {
+                    await addDoc(collection(db, "restaurants"), r);
+                }
+                allRestaurants = defaultRestaurants;
             }
-        });
-        document.getElementById('setDropoffBtn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (window.lastSearchResult) {
-                setLocationForActiveMode(window.lastSearchResult, window.lastSearchResult.display_name);
-            } else if (tempDropoff) {
-                // already set
-            } else {
-                Swal.fire('Search first', 'Type an address and select a result', 'info');
-            }
-        });
-
-        document.getElementById('clearPickup').addEventListener('click', (e) => {
-            e.stopPropagation();
-            tempPickup = null; tempPickupAddress = null;
-            updateLocationUI(); autoPrice();
-            if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
-            drawCustomerRoute();
-        });
-        document.getElementById('clearDropoff').addEventListener('click', (e) => {
-            e.stopPropagation();
-            tempDropoff = null; tempDropoffAddress = null;
-            updateLocationUI(); autoPrice();
-            if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
-            drawCustomerRoute();
-        });
-        document.getElementById('clearAllBtn').addEventListener('click', () => {
-            tempPickup = null; tempPickupAddress = null;
-            tempDropoff = null; tempDropoffAddress = null;
-            updateLocationUI(); autoPrice();
-            if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
-            if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
-            drawCustomerRoute();
-            Swal.fire({ title: 'Cleared all', icon: 'info', timer: 800, showConfirmButton: false });
-        });
-
-        document.getElementById('useMyLocation').addEventListener('click', () => {
-            haptic();
-            if (navigator.geolocation) {
-                Swal.fire({ title: 'Getting location...', timer: 2000, didOpen: () => Swal.showLoading() });
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setLocationForActiveMode(latlng, "📍 My current location");
-                    if (window.customerMap) window.customerMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
-                    Swal.close();
-                }, () => { Swal.fire('Error', 'Could not get location', 'error'); });
-            } else Swal.fire('Error', 'Geolocation not supported', 'error');
-        });
-
-        document.getElementById('saveLocationBtn').addEventListener('click', async () => {
-            haptic();
-            const loc = mapSelectMode === 'pickup' ? tempPickup : tempDropoff;
-            const addr = mapSelectMode === 'pickup' ? tempPickupAddress : tempDropoffAddress;
-            if (!loc) return Swal.fire('No location to save', 'Set a location first', 'warning');
-            const { value: name } = await Swal.fire({
-                title: 'Save this place',
-                input: 'text',
-                inputLabel: 'Name (e.g., Home, Work)',
-                inputPlaceholder: 'My place',
-                showCancelButton: true
-            });
-            if (!name) return;
-            savedPlaces.push({ name, lat: loc.lat, lng: loc.lng, address: addr || 'Point on map' });
-            await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
-            renderSavedPlaces();
-            Swal.fire({ title: 'Saved!', icon: 'success', timer: 1000, showConfirmButton: false });
-        });
-
-        document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerTabs(); };
-        document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerTabs(); };
-
-        document.getElementById('publishBtn').onclick = async () => {
-            haptic();
-            if (!tempPickup || !tempDropoff) return Swal.fire('Error', 'Please set both pickup and dropoff points', 'warning');
-            const same = tempPickup.lat === tempDropoff.lat && tempPickup.lng === tempDropoff.lng;
-            if (same) return Swal.fire('Same location', 'Pickup and dropoff cannot be the same point', 'warning');
-            let price = parseFloat(document.getElementById('priceInput').value);
-            if (isNaN(price)) price = autoPrice() || 0;
-            if (price <= 0) return Swal.fire('Invalid price', 'Please enter a valid price', 'warning');
-            const detail = document.getElementById('cargoSelect').value;
-            const payment = document.getElementById('paymentSelect').value;
-            try {
-                const counterRef = doc(db, "counters", "requests");
-                let tripNumber = 1;
-                await runTransaction(db, async (transaction) => {
-                    const counterDoc = await transaction.get(counterRef);
-                    if (counterDoc.exists()) tripNumber = counterDoc.data().current + 1;
-                    transaction.set(counterRef, { current: tripNumber });
-                });
-                const req = {
-                    customerId: currentUser.uid,
-                    customerName: currentUser.email,
-                    type: serviceType,
-                    cargoDetail: detail,
-                    price,
-                    paymentMethod: payment,
-                    status: 'pending',
-                    driverId: null,
-                    driverName: null,
-                    driverCar: '',
-                    driverPlate: '',
-                    pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
-                    dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
-                    pickupAddress: tempPickupAddress || 'Pickup point',
-                    dropoffAddress: tempDropoffAddress || 'Dropoff point',
-                    createdAt: serverTimestamp(),
-                    tripNumber: tripNumber
-                };
-                await addDoc(collection(db, "requests"), req);
-                const recentLoc = { lat: tempPickup.lat, lng: tempPickup.lng, address: tempPickupAddress };
-                recentPlaces = [recentLoc, ...recentPlaces.filter(p => p.lat !== recentLoc.lat || p.lng !== recentLoc.lng)].slice(0, 5);
-                await setDoc(doc(db, "recentPlaces", currentUser.uid), { places: recentPlaces });
-                Swal.fire({ title: 'Request sent!', icon: 'success', timer: 2000, showConfirmButton: false });
-                showNotification('New request', 'Drivers can see it');
-                tempPickup = null; tempPickupAddress = null;
-                tempDropoff = null; tempDropoffAddress = null;
-                updateLocationUI(); autoPrice();
-                if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
-                if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
-                drawCustomerRoute();
-            } catch(e) {
-                Swal.fire('Error', e.message, 'error');
-            }
+            renderRestaurantList();
         };
-
-        // Search
-        const searchInput = document.getElementById('searchInput');
-        const resultsDiv = document.getElementById('searchResults');
-        let timeout;
-        searchInput.addEventListener('input', () => {
-            clearTimeout(timeout);
-            const q = searchInput.value;
-            if (q.length < 3) { resultsDiv.classList.add('hidden'); return; }
-            timeout = setTimeout(async () => {
-                const res = await searchAddress(q);
-                if (!res.length) { resultsDiv.classList.add('hidden'); return; }
-                resultsDiv.innerHTML = res.map(r => `<div class="autocomplete-item p-2 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}">${r.display_name.substring(0,60)}</div>`).join('');
-                resultsDiv.classList.remove('hidden');
-                document.querySelectorAll('.autocomplete-item').forEach(el => {
-                    el.addEventListener('click', () => {
-                        const lat = parseFloat(el.dataset.lat);
-                        const lng = parseFloat(el.dataset.lng);
-                        const name = el.dataset.name;
-                        window.lastSearchResult = { lat, lng, display_name: name };
-                        setLocationForActiveMode({ lat, lng }, name);
-                        searchInput.value = name;
-                        resultsDiv.classList.add('hidden');
+        const renderRestaurantList = () => {
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-3">🍔 Order Food</h3>
+                <div id="foodContent" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${allRestaurants.map(r => `
+                        <div class="restaurant-card" data-id="${r.id || r.name}">
+                            <div class="flex items-center gap-2"><span class="text-2xl">${r.logo || '🍽️'}</span><div><div class="font-bold">${r.name}</div><div class="text-xs opacity-60">${r.cuisine || ''} • ${r.location || ''}</div></div></div>
+                            <button class="view-menu-btn mt-2 text-sm bg-primary text-white px-3 py-1 rounded-full">View Menu</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <div id="foodCartPanel" class="mt-4 border-t pt-3">
+                    <div class="flex justify-between items-center"><span class="font-bold">🛒 Cart</span><span id="cartCount">0 items</span></div>
+                    <div id="cartItems" class="mt-2"></div>
+                    <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">Checkout (ZMW)</button>
+                </div>
+            `;
+            // Attach view menu
+            document.querySelectorAll('.view-menu-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const card = e.target.closest('.restaurant-card');
+                    const name = card.querySelector('.font-bold').innerText;
+                    const restaurant = allRestaurants.find(r => r.name === name);
+                    if (!restaurant) return;
+                    // Show menu in modal
+                    let menuHtml = restaurant.items.map(item => `
+                        <div class="menu-item"><span>${item.name}</span><span>${CURRENCY}${item.price} <button class="add-to-cart-btn bg-primary text-white text-xs px-2 py-0.5 rounded-full" data-restaurant="${restaurant.name}" data-name="${item.name}" data-price="${item.price}">+</button></span></div>
+                    `).join('');
+                    Swal.fire({
+                        title: `${restaurant.logo || '🍽️'} ${restaurant.name}`,
+                        html: `<div class="text-left">${menuHtml}</div>`,
+                        confirmButtonText: 'Close',
+                        didOpen: () => {
+                            document.querySelectorAll('.add-to-cart-btn').forEach(b => {
+                                b.addEventListener('click', () => {
+                                    const rname = b.dataset.restaurant;
+                                    const iname = b.dataset.name;
+                                    const iprice = parseFloat(b.dataset.price);
+                                    const existing = foodCart.find(x => x.restaurant === rname && x.name === iname);
+                                    if (existing) existing.qty = (existing.qty || 1) + 1;
+                                    else foodCart.push({ restaurant: rname, name: iname, price: iprice, qty: 1 });
+                                    updateCartUI();
+                                    Swal.fire({ title: 'Added!', icon: 'success', timer: 500, showConfirmButton: false });
+                                });
+                            });
+                        }
                     });
                 });
-            }, 400);
-        });
-        document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.classList.add('hidden'); });
+            });
+            updateCartUI();
+            document.getElementById('checkoutFoodBtn').addEventListener('click', async () => {
+                if (foodCart.length === 0) return Swal.fire('Cart empty');
+                // Get current location from tempPickup or ask
+                let deliveryAddr = tempPickupAddress || 'Not set';
+                if (!tempPickup) {
+                    const { value: addr } = await Swal.fire({ title: 'Delivery address', input: 'text', inputLabel: 'Enter address', inputValue: deliveryAddr });
+                    if (addr) deliveryAddr = addr;
+                    else return;
+                }
+                const total = foodCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                const order = {
+                    customerId: currentUser.uid,
+                    customerName: currentUser.email,
+                    items: foodCart,
+                    total,
+                    deliveryAddress: deliveryAddr,
+                    status: 'pending',
+                    createdAt: serverTimestamp()
+                };
+                await addDoc(collection(db, "foodOrders"), order);
+                foodCart = [];
+                updateCartUI();
+                Swal.fire({ title: 'Order placed!', icon: 'success', timer: 2000 });
+                showNotification('Food order', 'Your food is being prepared');
+            });
+        };
+        const updateCartUI = () => {
+            const countSpan = document.getElementById('cartCount');
+            const itemsDiv = document.getElementById('cartItems');
+            if (countSpan) countSpan.innerText = foodCart.reduce((s,i) => s + i.qty, 0) + ' items';
+            if (itemsDiv) {
+                if (foodCart.length === 0) itemsDiv.innerHTML = '<div class="text-sm opacity-60">Cart is empty</div>';
+                else {
+                    itemsDiv.innerHTML = foodCart.map(i => `
+                        <div class="cart-item"><span>${i.name} × ${i.qty}</span><span>${CURRENCY}${(i.price * i.qty).toFixed(2)} <button class="remove-cart-item text-red-500 text-xs" data-name="${i.name}" data-restaurant="${i.restaurant}">✕</button></span></div>
+                    `).join('');
+                    document.querySelectorAll('.remove-cart-item').forEach(b => {
+                        b.addEventListener('click', () => {
+                            const name = b.dataset.name, restaurant = b.dataset.restaurant;
+                            foodCart = foodCart.filter(i => !(i.name === name && i.restaurant === restaurant));
+                            updateCartUI();
+                        });
+                    });
+                }
+            }
+            const checkoutBtn = document.getElementById('checkoutFoodBtn');
+            if (checkoutBtn) {
+                const total = foodCart.reduce((s,i) => s + i.price * i.qty, 0);
+                checkoutBtn.innerText = `Checkout (${CURRENCY}${total.toFixed(2)})`;
+            }
+        };
+        loadRestaurants();
+    }
 
-        renderSavedPlaces();
-        renderRecentPlaces();
-        initCustomerMap();
-        updateLocationUI();
-        if (tempPickup && tempDropoff) autoPrice();
+    // ----- CUSTOMER ACTIVE TRIP (with routing) -----
+    function renderCustomerActiveTab(container) {
+        const my = allRequests.filter(r => r.customerId === currentUser.uid);
+        const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
+        if (!active) {
+            container.innerHTML = `<div class="text-center py-8 text-gray-400">You have no active trip</div>`;
+            return;
+        }
+        const tripDisplay = active.tripNumber ? `#${active.tripNumber}` : `#${active.id.substring(0,6)}`;
+        let progressHtml = '';
+        if (active.status === 'pending') progressHtml = `<div class="progress-step"><span class="dot active"></span> Waiting for driver... <span class="progress-line"></span><span class="dot"></span> En route <span class="progress-line"></span><span class="dot"></span> Delivered</div>`;
+        else if (active.status === 'accepted') progressHtml = `<div class="progress-step"><span class="dot done"></span> Driver assigned <span class="progress-line done"></span><span class="dot active"></span> En route <span class="progress-line"></span><span class="dot"></span> Delivered</div>`;
+        else if (active.status === 'pickedUp') progressHtml = `<div class="progress-step"><span class="dot done"></span> Driver assigned <span class="progress-line done"></span><span class="dot done"></span> En route <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
+        let ratingHtml = '';
+        if (active.status === 'delivered' && !active.rated) {
+            ratingHtml = `<div class="mt-3 border-t pt-2"><p class="text-sm font-medium">Rate your driver</p><div id="ratingStars" class="flex gap-1 my-2">${[1,2,3,4,5].map(i=>`<span class="star-rating" data-rating="${i}">★</span>`).join('')}</div><input type="text" id="ratingComment" placeholder="Comment (optional)" class="mt-2 text-sm"><button id="submitRating" class="btn-primary text-xs mt-2">Submit</button></div>`;
+        }
+        let chatHtml = '';
+        if (active.status === 'accepted' || active.status === 'pickedUp') {
+            chatHtml = `<div class="mt-3 border-t pt-2"><details id="chatDetails"><summary id="chatSummary">💬 Chat with driver <span id="chatBadge" class="chat-badge hidden">0</span></summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>`;
+        }
+        let mapHtml = '';
+        if (active.pickupLatLng && active.dropoffLatLng && (active.status === 'accepted' || active.status === 'pickedUp')) {
+            mapHtml = `<div class="mt-3 border-t pt-2"><div class="text-sm font-semibold">📍 Live tracking</div><div id="activeTripMiniMap" class="map-container h-40"></div><div id="tripETA" class="text-sm mt-1">ETA: <span id="etaMini">—</span></div></div>`;
+        }
+        container.innerHTML = `
+            <div class="space-y-3">
+                <div class="flex justify-between items-center"><span class="font-semibold">Trip ${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span></div>
+                ${progressHtml}
+                <div><span class="text-gray-500">Service:</span> ${active.type}</div>
+                <div><span class="text-gray-500">Details:</span> ${active.cargoDetail}</div>
+                <div><span class="text-gray-500">Price:</span> ${CURRENCY}${active.price}</div>
+                <div><span class="text-gray-500">Payment:</span> ${active.paymentMethod}</div>
+                ${active.driverName ? `<div class="border-t pt-2 mt-2"><div><span class="text-gray-500">Driver:</span> ${active.driverName}</div><div><span class="text-gray-500">Car:</span> ${active.driverCar || '—'}</div><div><span class="text-gray-500">Plate:</span> ${active.driverPlate || '—'}</div></div>` : '<div class="text-gray-400">Waiting for a driver...</div>'}
+                ${ratingHtml}
+                ${chatHtml}
+                ${mapHtml}
+            </div>`;
+        // rating logic
+        if (active.status === 'delivered' && !active.rated) {
+            let selected=0; document.querySelectorAll('.star-rating').forEach(s=>{s.addEventListener('click',function(){selected=parseInt(this.dataset.rating); document.querySelectorAll('.star-rating').forEach(st=>st.style.color=(parseInt(st.dataset.rating)<=selected)?'#f59e0b':'#d1d5db');});}); document.getElementById('submitRating').addEventListener('click',async()=>{if(!selected) return Swal.fire('Select rating'); const comment=document.getElementById('ratingComment').value; await rateDriver(active.id,active.driverId,selected,comment); await updateDoc(doc(db,"requests",active.id),{rated:true}); renderCustomerTabs();});
+        }
+        if (active.status === 'accepted' || active.status === 'pickedUp') {
+            currentChatId=active.id; loadChat(active.id,true);
+            setTimeout(()=>{
+                const miniMapDiv=document.getElementById('activeTripMiniMap');
+                if(miniMapDiv){
+                    const map=L.map('activeTripMiniMap').setView([active.pickupLatLng.lat,active.pickupLatLng.lng],12);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    L.marker([active.pickupLatLng.lat,active.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
+                    L.marker([active.dropoffLatLng.lat,active.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
+                    // route with routing machine
+                    L.Routing.control({
+                        waypoints: [L.latLng(active.pickupLatLng.lat,active.pickupLatLng.lng), L.latLng(active.dropoffLatLng.lat,active.dropoffLatLng.lng)],
+                        routeWhileDragging: false,
+                        showAlternatives: false,
+                        lineOptions: {styles: [{color: 'var(--primary)', weight: 4}]},
+                        createMarker: function() { return null; }
+                    }).addTo(map);
+                    if (active.driverId) {
+                        const unsub = onSnapshot(doc(db,"drivers",active.driverId), (snap) => {
+                            if(snap.exists()){
+                                const loc=snap.data();
+                                const driverMarker = L.marker([loc.currentLat,loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] }) }).addTo(map).bindTooltip('Driver');
+                                map.setView([loc.currentLat,loc.currentLng],13);
+                                const dist = haversine(loc.currentLat,loc.currentLng,active.dropoffLatLng.lat,active.dropoffLatLng.lng);
+                                document.getElementById('etaMini').innerText = estimateTime(dist);
+                                unsub();
+                            }
+                        });
+                    } else {
+                        const dist = haversine(active.pickupLatLng.lat,active.pickupLatLng.lng,active.dropoffLatLng.lat,active.dropoffLatLng.lng);
+                        document.getElementById('etaMini').innerText = estimateTime(dist);
+                    }
+                }
+            }, 300);
+        }
+    }
+
+    // ----- CUSTOMER HISTORY (with food orders) -----
+    function renderCustomerHistoryTab(container) {
+        // Show both ride/delivery and food orders
+        const rideHistory = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
+        // also fetch food orders from Firestore
+        const getFoodOrders = async () => {
+            const snap = await getDocs(query(collection(db,"foodOrders"), where("customerId","==",currentUser.uid), orderBy("createdAt","desc")));
+            const foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            let html = '';
+            if (rideHistory.length === 0 && foodOrders.length === 0) {
+                html = `<div class="text-center py-8 text-gray-400">No past trips or food orders</div>`;
+            } else {
+                // Ride history
+                if (rideHistory.length) {
+                    html += `<h4 class="font-semibold mt-2">🚗 Rides & Deliveries</h4>`;
+                    html += rideHistory.map(r => {
+                        const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+                        return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center"><div><span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}<br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span></div><button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button></div>`;
+                    }).join('');
+                }
+                // Food orders
+                if (foodOrders.length) {
+                    html += `<h4 class="font-semibold mt-2">🍔 Food Orders</h4>`;
+                    html += foodOrders.map(o => `<div class="border-b border-gray-100 dark:border-gray-700 py-2"><span class="font-medium">Order #${o.id.substring(0,6)}</span> – ${CURRENCY}${o.total}<br><span class="text-xs text-gray-400">📅 ${formatDate(o.createdAt)}</span></div>`).join('');
+                }
+            }
+            container.innerHTML = html;
+            document.querySelectorAll('.view-trip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const trip = allRequests.find(r => r.id === btn.dataset.id);
+                    if(trip && trip.pickupLatLng && trip.dropoffLatLng){
+                        Swal.fire({title:'Trip route', html:`<div id="miniMap" style="height:200px;"></div>`, didOpen:()=>{setTimeout(()=>{const map=L.map('miniMap').setView([trip.pickupLatLng.lat,trip.pickupLatLng.lng],12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([trip.pickupLatLng.lat,trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup'); L.marker([trip.dropoffLatLng.lat,trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff'); L.Routing.control({waypoints:[L.latLng(trip.pickupLatLng.lat,trip.pickupLatLng.lng),L.latLng(trip.dropoffLatLng.lat,trip.dropoffLatLng.lng)],routeWhileDragging:false,showAlternatives:false,lineOptions:{styles:[{color:'var(--primary)',weight:4}]},createMarker:function(){return null;}}).addTo(map);},100);}});
+                    }
+                });
+            });
+        };
+        getFoodOrders();
+    }
+
+    // ============================================================
+    // =============== DRIVER DASHBOARD ============================
+    // ============================================================
+    function renderDriverTabs() {
+        const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+        const total = completed.reduce((s,r) => s + r.price, 0);
+        const today = new Date().toDateString();
+        const todayEarn = completed.filter(r => r.createdAt?.toDate?.()?.toDateString() === today).reduce((s,r) => s + r.price, 0);
+        document.getElementById('appContainer').innerHTML = `
+            <div class="fade-in">
+                ${renderHeader(`🚚 Driver`, 'logoutDriver')}
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <div class="bg-primary-light p-2 rounded-xl text-center" style="background:var(--primary-bg);"><span class="text-xs">Today</span><div class="font-bold">${CURRENCY}${todayEarn}</div></div>
+                    <div class="bg-blue-50 dark:bg-blue-900 p-2 rounded-xl text-center"><span class="text-xs">Week</span><div class="font-bold">${CURRENCY}${completed.filter(r => r.createdAt?.toDate?.() > new Date(Date.now()-7*86400000)).reduce((s,r)=>s+r.price,0)}</div></div>
+                    <div class="bg-amber-50 dark:bg-amber-900 p-2 rounded-xl text-center"><span class="text-xs">Total</span><div class="font-bold">${CURRENCY}${total}</div></div>
+                </div>
+                <div class="flex items-center gap-2 text-sm mb-3"><span>⭐ Rating: ${driverData.averageRating?.toFixed(1) || 'N/A'}</span><span class="bg-green-100 dark:bg-green-900 px-3 py-0.5 rounded-full">${driverData.status}</span></div>
+                <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='map'?'tab-active':''}" data-tab="map">🗺️ Map</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Available</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 Active</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
+                </div>
+                <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
+            </div>`;
+        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
+        document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{ activeTab=btn.dataset.tab; renderDriverTabs(); }));
+        document.getElementById('logoutDriver').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
+        document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
+        document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderDriverTabs();};
+        const content=document.getElementById('tabContent');
+        if(activeTab==='map') renderDriverMapTab(content);
+        else if(activeTab==='requests') renderDriverAvailableTab(content);
+        else if(activeTab==='active') renderDriverActiveTab(content);
+        else if(activeTab==='history') renderDriverHistoryTab(content);
+    }
+
+    function renderDriverMapTab(container) {
+        container.innerHTML = `<div id="driverMap" class="map-container"></div><div class="flex gap-2 mt-2"><button id="gpsBtn" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">📍 GPS</button><button id="centerDriverMap" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">🎯 Center</button></div>`;
+        initDriverMap();
+        document.getElementById('gpsBtn').onclick = () => { if(navigator.geolocation){Swal.fire({title:'Getting location...',timer:2000,didOpen:()=>Swal.showLoading()}); navigator.geolocation.getCurrentPosition(pos=>{updateDriverLoc(pos.coords.latitude,pos.coords.longitude); Swal.close();});}};
+        document.getElementById('centerDriverMap').onclick = () => driverMap.setView([driverData.currentLat,driverData.currentLng],14);
+    }
+
+    function initDriverMap() {
+        if(driverMap){driverMap.remove(); driverMap=null;}
+        driverMap = L.map('driverMap').setView([driverData.currentLat,driverData.currentLng],13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(driverMap);
+        driverMarker = L.marker([driverData.currentLat,driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap).bindTooltip('You');
+        window.driverMap = driverMap;
+        const activeId = driverData.activeRequestId;
+        if(activeId){
+            const trip = allRequests.find(r => r.id === activeId);
+            if(trip && trip.pickupLatLng && trip.dropoffLatLng){
+                L.marker([trip.pickupLatLng.lat,trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
+                L.marker([trip.dropoffLatLng.lat,trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
+                // routing
+                L.Routing.control({
+                    waypoints: [L.latLng(driverData.currentLat,driverData.currentLng), L.latLng(trip.dropoffLatLng.lat,trip.dropoffLatLng.lng)],
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    lineOptions: {styles: [{color: 'var(--primary)', weight: 4}]},
+                    createMarker: function() { return null; }
+                }).addTo(driverMap);
+            }
+        }
+    }
+
+    async function updateDriverLoc(lat,lng) {
+        driverData.currentLat=lat; driverData.currentLng=lng;
+        await updateDoc(doc(db,"drivers",currentUser.uid),{currentLat:lat,currentLng:lng});
+        if(driverMarker) driverMarker.setLatLng([lat,lng]);
+        if(driverMap) driverMap.setView([lat,lng],13);
+        renderDriverTabs();
+    }
+
+    function renderDriverAvailableTab(container) {
+        const pending = allRequests.filter(r => r.status === 'pending');
+        if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No requests available</div>'; return; }
+        container.innerHTML = pending.map(req => {
+            const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
+                <div><span class="font-medium">${tripDisplay} (${req.type})</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
+                <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}">Accept</button>
+            </div>`;
+        }).join('');
+        document.querySelectorAll('.acceptReq').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const req = allRequests.find(r => r.id === btn.dataset.id);
+                if (req && req.status === 'pending' && driverData.status !== 'busy') {
+                    const driverSnap = await getDoc(doc(db,"drivers",currentUser.uid));
+                    const drv = driverSnap.data() || {};
+                    await updateDoc(doc(db,"requests",req.id), {
+                        status: 'accepted',
+                        driverId: currentUser.uid,
+                        driverName: currentUser.email,
+                        driverCar: drv.carModel || '',
+                        driverPlate: drv.plate || ''
+                    });
+                    await updateDoc(doc(db,"drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
+                    driverData.activeRequestId = req.id; driverData.status = "busy";
+                    renderDriverTabs();
+                    showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
+                } else Swal.fire('Cannot accept', 'Busy or taken', 'warning');
+            });
+        });
+    }
+
+    function renderDriverActiveTab(container) {
+        const activeId = driverData.activeRequestId;
+        if (!activeId) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No active trip</div>'; return; }
+        const trip = allRequests.find(r => r.id === activeId);
+        if (!trip) { container.innerHTML = '<div class="text-center py-8 text-gray-400">Loading...</div>'; return; }
+        const distToDropoff = trip.dropoffLatLng ? haversine(driverData.currentLat,driverData.currentLng,trip.dropoffLatLng.lat,trip.dropoffLatLng.lng) : 0;
+        const tripDisplay = trip.tripNumber ? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
+        let progressHtml = '';
+        if (trip.status === 'accepted') progressHtml = `<div class="progress-step"><span class="dot done"></span> Accepted <span class="progress-line done"></span><span class="dot active"></span> Go to pickup <span class="progress-line"></span><span class="dot"></span> Deliver</div>`;
+        else if (trip.status === 'pickedUp') progressHtml = `<div class="progress-step"><span class="dot done"></span> Accepted <span class="progress-line done"></span><span class="dot done"></span> Picked up <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
+        let chatHtml = `<div class="mt-2"><details id="chatDetails"><summary id="chatSummary">💬 Chat with customer <span id="chatBadge" class="chat-badge hidden">0</span></summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>`;
+        container.innerHTML = `
+            <div class="space-y-3">
+                <div class="flex justify-between"><span class="font-semibold">${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
+                ${progressHtml}
+                <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
+                <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
+                <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
+                <div><span class="text-gray-500">Distance to dropoff:</span> ${distToDropoff.toFixed(2)} km (${estimateTime(distToDropoff)})</div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📍 Move to pickup</button>
+                    <button id="moveToDropoff" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>🏁 Move to dropoff</button>
+                    <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
+                    <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
+                </div>
+                ${chatHtml}
+            </div>`;
+        document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
+        document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
+        document.getElementById('markPicked').onclick = async () => { if (trip.status === 'accepted') { await updateDoc(doc(db,"requests",trip.id),{status:'pickedUp'}); renderDriverTabs(); showNotification('Picked up', `You picked up ${trip.customerName}`); } };
+        document.getElementById('markDelivered').onclick = async () => { if (trip.status === 'pickedUp') { await updateDoc(doc(db,"requests",trip.id),{status:'delivered'}); await updateDoc(doc(db,"drivers",currentUser.uid),{activeRequestId:null,status:"online"}); driverData.activeRequestId=null; driverData.status="online"; renderDriverTabs(); showNotification('Delivered', `Trip completed with ${trip.customerName}`); } };
+        if (trip.id) loadChat(trip.id, true);
+    }
+
+    function renderDriverHistoryTab(container) {
+        const my = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+        if (!my.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No completed trips</div>'; return; }
+        container.innerHTML = my.map(r => {
+            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
+                <div><span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span><br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span></div>
+                <span class="text-sm text-gray-400">${r.customerName}</span>
+            </div>`;
+        }).join('');
+    }
+
+    // ---------- CHAT ----------
+    async function loadChat(requestId, showBadge = false) {
+        if (chatUnsub) chatUnsub();
+        const chatRef = collection(db, "chats", requestId, "messages");
+        const q = query(chatRef, orderBy("timestamp"));
+        const userId = currentUser.uid;
+        let lastRead = null;
+        try {
+            const readDoc = await getDoc(doc(db, "chatReads", requestId));
+            if (readDoc.exists() && readDoc.data()[userId]) {
+                lastRead = readDoc.data()[userId].toDate ? readDoc.data()[userId].toDate() : new Date(readDoc.data()[userId]);
+            }
+        } catch(e) {}
+        chatUnsub = onSnapshot(q, (snap) => {
+            const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const chatDiv = document.getElementById('chatMessages');
+            if (chatDiv) {
+                chatDiv.innerHTML = messages.map(m => `<div class="chat-message"><b>${m.senderName}:</b> ${m.text} <span class="time">${formatTime(m.timestamp)}</span></div>`).join('');
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }
+            if (showBadge && lastRead !== null) {
+                const unread = messages.filter(m => {
+                    const ts = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+                    return ts > lastRead && m.senderId !== userId;
+                });
+                const badge = document.getElementById('chatBadge');
+                if (badge) {
+                    if (unread.length > 0) { badge.innerText = unread.length; badge.classList.remove('hidden'); }
+                    else { badge.classList.add('hidden'); }
+                }
+            } else {
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            }
+        });
+        const details = document.getElementById('chatDetails');
+        if (details) {
+            details.addEventListener('toggle', async () => {
+                if (details.open) {
+                    await setDoc(doc(db, "chatReads", requestId), { [userId]: serverTimestamp() }, { merge: true });
+                    const badge = document.getElementById('chatBadge');
+                    if (badge) badge.classList.add('hidden');
+                }
+            });
+        }
+        const sendBtn = document.getElementById('sendChat');
+        const input = document.getElementById('chatInput');
+        if (sendBtn && input) {
+            const newSend = async () => {
+                const text = input.value.trim();
+                if (!text) return;
+                await addDoc(collection(db, "chats", requestId, "messages"), { senderId: userId, senderName: currentUser.email, text, timestamp: serverTimestamp() });
+                input.value = '';
+                await setDoc(doc(db, "chatReads", requestId), { [userId]: serverTimestamp() }, { merge: true });
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            };
+            sendBtn.onclick = newSend;
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
+        }
     }
 
     // ---------- CORE LOCATION FUNCTIONS ----------
     function setLocationForActiveMode(latlng, address) {
         haptic();
-        if (mapSelectMode === 'pickup') {
-            tempPickup = latlng;
-            tempPickupAddress = address || '📍 Point on map';
-        } else {
-            tempDropoff = latlng;
-            tempDropoffAddress = address || '🏁 Point on map';
-        }
+        if (mapSelectMode === 'pickup') { tempPickup = latlng; tempPickupAddress = address || '📍 Point'; }
+        else { tempDropoff = latlng; tempDropoffAddress = address || '🏁 Point'; }
         updateLocationUI();
         autoPrice();
         if (window.customerMap) {
-            if (pickupMarker) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
-            if (dropoffMarker) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
-            if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(window.customerMap).bindTooltip('Pickup');
-            if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(window.customerMap).bindTooltip('Dropoff');
+            if (pickupMarker) { window.customerMap.removeLayer(pickupMarker); pickupMarker=null; }
+            if (dropoffMarker) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null; }
+            if (tempPickup) pickupMarker = L.marker([tempPickup.lat,tempPickup.lng]).addTo(window.customerMap).bindTooltip('Pickup');
+            if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat,tempDropoff.lng]).addTo(window.customerMap).bindTooltip('Dropoff');
             drawCustomerRoute();
         }
         if (latlng && address) {
             const recentLoc = { lat: latlng.lat, lng: latlng.lng, address: address };
-            recentPlaces = [recentLoc, ...recentPlaces.filter(p => p.lat !== recentLoc.lat || p.lng !== recentLoc.lng)].slice(0, 5);
-            setDoc(doc(db, "recentPlaces", currentUser.uid), { places: recentPlaces }).catch(()=>{});
+            recentPlaces = [recentLoc, ...recentPlaces.filter(p => p.lat !== recentLoc.lat || p.lng !== recentLoc.lng)].slice(0,5);
+            setDoc(doc(db,"recentPlaces",currentUser.uid),{places:recentPlaces}).catch(()=>{});
             renderRecentPlaces();
         }
     }
@@ -740,38 +933,44 @@
         renderSavedPlaces();
     }
 
-    // ---------- MAP ----------
     function initCustomerMap() {
         if (customerMap) { customerMap.remove(); customerMap = null; }
         const center = tempPickup || { lat: -15.3875, lng: 28.3228 };
         customerMap = L.map('customerMap').setView([center.lat, center.lng], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(customerMap);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(customerMap);
         customerMap.on('click', (e) => {
-            const latlng = e.latlng;
-            const addr = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
-            setLocationForActiveMode(latlng, addr);
+            const ll = e.latlng;
+            setLocationForActiveMode(ll, `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`);
         });
-        if (tempPickup) pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
-        if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
+        if (tempPickup) pickupMarker = L.marker([tempPickup.lat,tempPickup.lng]).addTo(customerMap).bindTooltip('Pickup');
+        if (tempDropoff) dropoffMarker = L.marker([tempDropoff.lat,tempDropoff.lng]).addTo(customerMap).bindTooltip('Dropoff');
         window.customerMap = customerMap;
         drawCustomerRoute();
+        // If both points set, show routing
+        if (tempPickup && tempDropoff) {
+            L.Routing.control({
+                waypoints: [L.latLng(tempPickup.lat,tempPickup.lng), L.latLng(tempDropoff.lat,tempDropoff.lng)],
+                routeWhileDragging: false,
+                showAlternatives: false,
+                lineOptions: {styles: [{color: 'var(--primary)', weight: 4}]},
+                createMarker: function() { return null; }
+            }).addTo(customerMap);
+        }
+        // driver tracking
         const activeTrip = allRequests.find(r => r.customerId === currentUser?.uid && (r.status === 'accepted' || r.status === 'pickedUp'));
         if (activeTrip && activeTrip.driverId) {
             if (driverPosUnsub) driverPosUnsub();
-            driverPosUnsub = onSnapshot(doc(db, "drivers", activeTrip.driverId), (docSnap) => {
+            driverPosUnsub = onSnapshot(doc(db,"drivers",activeTrip.driverId), (docSnap) => {
                 if (docSnap.exists() && window.customerMap) {
                     const loc = docSnap.data();
-                    if (driverMarkerCust) {
-                        driverMarkerCust.setLatLng([loc.currentLat, loc.currentLng]);
-                    } else {
-                        driverMarkerCust = L.marker([loc.currentLat, loc.currentLng], {
-                            icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700 text-2xl"></i>', iconSize: [24,24] })
-                        }).addTo(window.customerMap).bindTooltip(`Driver: ${activeTrip.driverName || 'Driver'}`);
-                    }
+                    if (driverMarkerCust) driverMarkerCust.setLatLng([loc.currentLat,loc.currentLng]);
+                    else driverMarkerCust = L.marker([loc.currentLat,loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-truck-fast text-indigo-700 text-2xl"></i>', iconSize: [24,24] }) }).addTo(window.customerMap).bindTooltip('Driver');
                     if (activeTrip.dropoffLatLng) {
-                        const dist = haversine(loc.currentLat, loc.currentLng, activeTrip.dropoffLatLng.lat, activeTrip.dropoffLatLng.lng);
+                        const dist = haversine(loc.currentLat,loc.currentLng,activeTrip.dropoffLatLng.lat,activeTrip.dropoffLatLng.lng);
                         const eta = estimateTime(dist);
                         if (driverMarkerCust) driverMarkerCust.bindTooltip(`Driver • ETA ${eta}`).openTooltip();
+                        const etaSpan = document.getElementById('etaDisplay');
+                        if (etaSpan) etaSpan.innerText = eta;
                     }
                 }
             });
@@ -784,31 +983,27 @@
             customerRouteLine = null;
         }
         if (tempPickup && tempDropoff && window.customerMap) {
-            customerRouteLine = L.polyline([[tempPickup.lat, tempPickup.lng], [tempDropoff.lat, tempDropoff.lng]], {
-                color: 'var(--primary)',
-                weight: 3,
-                dashArray: '5,10'
-            }).addTo(window.customerMap);
+            customerRouteLine = L.polyline([[tempPickup.lat,tempPickup.lng],[tempDropoff.lat,tempDropoff.lng]], { color: 'var(--primary)', weight: 3, dashArray: '5,10' }).addTo(window.customerMap);
         }
     }
 
-    // ---------- SAVED & RECENT PLACES ----------
+    // ---------- SAVED & RECENT ----------
     async function renderSavedPlaces() {
         const container = document.getElementById('savedPlacesList');
         if (!container) return;
         if (!savedPlaces.length) { container.innerHTML = ''; return; }
         container.innerHTML = savedPlaces.map(p => `<div class="saved-place-item" data-lat="${p.lat}" data-lng="${p.lng}" data-name="${p.name}" data-address="${p.address||p.name}"><i class="fas fa-map-pin" style="color:var(--primary);"></i> ${escapeHtml(p.name)} <i class="fas fa-trash-alt text-red-400 delete-place" data-name="${p.name}" style="cursor:pointer"></i></div>`).join('');
         document.querySelectorAll('.saved-place-item').forEach(el => {
-            const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), name = el.dataset.name, address = el.dataset.address;
+            const lat=parseFloat(el.dataset.lat), lng=parseFloat(el.dataset.lng), name=el.dataset.name, address=el.dataset.address;
             el.addEventListener('click', (e) => {
                 if (e.target.classList.contains('delete-place')) return;
-                setLocationForActiveMode({ lat, lng }, address || name);
+                setLocationForActiveMode({lat,lng}, address||name);
             });
             const del = el.querySelector('.delete-place');
             if (del) del.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 savedPlaces = savedPlaces.filter(p => p.name !== name);
-                await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces });
+                await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces});
                 renderSavedPlaces();
             });
         });
@@ -818,517 +1013,56 @@
         const container = document.getElementById('recentPlacesList');
         if (!container) return;
         if (!recentPlaces.length) { container.innerHTML = ''; return; }
-        container.innerHTML = recentPlaces.map(p => `<div class="saved-place-item" data-lat="${p.lat}" data-lng="${p.lng}" data-address="${p.address||'Recent'}"><i class="fas fa-clock" style="color:var(--primary);"></i> ${escapeHtml(p.address || 'Recent place').substring(0,20)}</div>`).join('');
+        container.innerHTML = recentPlaces.map(p => `<div class="saved-place-item" data-lat="${p.lat}" data-lng="${p.lng}" data-address="${p.address||'Recent'}"><i class="fas fa-clock" style="color:var(--primary);"></i> ${escapeHtml(p.address || 'Recent').substring(0,20)}</div>`).join('');
         document.querySelectorAll('.saved-place-item').forEach(el => {
-            const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), address = el.dataset.address;
-            el.addEventListener('click', () => {
-                setLocationForActiveMode({ lat, lng }, address || 'Recent place');
-            });
+            const lat=parseFloat(el.dataset.lat), lng=parseFloat(el.dataset.lng), address=el.dataset.address;
+            el.addEventListener('click', () => { setLocationForActiveMode({lat,lng}, address||'Recent'); });
         });
     }
 
     async function searchAddress(q) {
-        if (q.length < 3) return [];
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=zm`;
-        try { const res = await fetch(url); const data = await res.json(); return data.map(i => ({ lat: parseFloat(i.lat), lng: parseFloat(i.lon), display_name: i.display_name })); } catch(e) { return []; }
+        if(q.length<3) return [];
+        const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=zm`;
+        try{const res=await fetch(url); const data=await res.json(); return data.map(i=>({lat:parseFloat(i.lat),lng:parseFloat(i.lon),display_name:i.display_name}));}catch(e){return [];}
     }
 
-    function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+    function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
-    // ---------- CUSTOMER ACTIVE TAB (with chat badge) ----------
-    function renderCustomerActiveTab(container) {
-        const my = allRequests.filter(r => r.customerId === currentUser.uid);
-        const active = my.find(r => ['pending','accepted','pickedUp'].includes(r.status));
-        if (!active) {
-            container.innerHTML = `<div class="text-center py-8 text-gray-400">You have no active trip</div>`;
-            return;
-        }
-        const tripDisplay = active.tripNumber ? `#${active.tripNumber}` : `#${active.id.substring(0,6)}`;
-
-        let progressHtml = '';
-        if (active.status === 'pending') {
-            progressHtml = `<div class="progress-step"><span class="dot active"></span> Waiting for driver... <span class="progress-line"></span><span class="dot"></span> En route <span class="progress-line"></span><span class="dot"></span> Delivered</div>`;
-        } else if (active.status === 'accepted') {
-            progressHtml = `<div class="progress-step"><span class="dot done"></span> Driver assigned <span class="progress-line done"></span><span class="dot active"></span> En route <span class="progress-line"></span><span class="dot"></span> Delivered</div>`;
-        } else if (active.status === 'pickedUp') {
-            progressHtml = `<div class="progress-step"><span class="dot done"></span> Driver assigned <span class="progress-line done"></span><span class="dot done"></span> En route <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
-        }
-
-        let ratingHtml = '';
-        if (active.status === 'delivered' && !active.rated) {
-            ratingHtml = `
-                <div class="mt-3 border-t pt-2">
-                    <p class="text-sm font-medium">Rate your driver</p>
-                    <div id="ratingStars" class="flex gap-1 my-2">
-                        <span class="star-rating" data-rating="1">★</span>
-                        <span class="star-rating" data-rating="2">★</span>
-                        <span class="star-rating" data-rating="3">★</span>
-                        <span class="star-rating" data-rating="4">★</span>
-                        <span class="star-rating" data-rating="5">★</span>
-                    </div>
-                    <input type="text" id="ratingComment" placeholder="Comment (optional)" class="mt-2 text-sm">
-                    <button id="submitRating" class="btn-primary text-xs mt-2">Submit Rating</button>
-                </div>`;
-        }
-
-        // Chat with unread badge
-        let chatHtml = '';
-        if (active.status === 'accepted' || active.status === 'pickedUp') {
-            chatHtml = `
-                <div class="mt-3 border-t pt-2">
-                    <details id="chatDetails">
-                        <summary id="chatSummary">💬 Chat with driver <span id="chatBadge" class="chat-badge hidden">0</span></summary>
-                        <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
-                        <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
-                    </details>
-                </div>`;
-        }
-
-        let mapHtml = '';
-        if (active.pickupLatLng && active.dropoffLatLng && (active.status === 'accepted' || active.status === 'pickedUp')) {
-            mapHtml = `<div class="mt-3 border-t pt-2"><div class="text-sm font-semibold">📍 Live tracking</div><div id="activeTripMiniMap" class="map-container h-40"></div></div>`;
-        }
-
-        container.innerHTML = `
-            <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                    <span class="font-semibold">Trip ${tripDisplay}</span>
-                    <span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${active.status}</span>
-                </div>
-                ${progressHtml}
-                <div><span class="text-gray-500">Service:</span> ${active.type}</div>
-                <div><span class="text-gray-500">Details:</span> ${active.cargoDetail}</div>
-                <div><span class="text-gray-500">Price:</span> ${CURRENCY}${active.price}</div>
-                <div><span class="text-gray-500">Payment:</span> ${active.paymentMethod}</div>
-                ${active.driverName ? `
-                    <div class="border-t pt-2 mt-2">
-                        <div><span class="text-gray-500">Driver:</span> ${active.driverName}</div>
-                        <div><span class="text-gray-500">Car:</span> ${active.driverCar || '—'}</div>
-                        <div><span class="text-gray-500">Plate:</span> ${active.driverPlate || '—'}</div>
-                    </div>
-                ` : '<div class="text-gray-400">Waiting for a driver...</div>'}
-                ${ratingHtml}
-                ${chatHtml}
-                ${mapHtml}
-            </div>`;
-
-        // Rating logic
-        if (active.status === 'delivered' && !active.rated) {
-            let selectedRating = 0;
-            const stars = document.querySelectorAll('.star-rating');
-            stars.forEach(star => {
-                star.addEventListener('click', function() {
-                    selectedRating = parseInt(this.dataset.rating);
-                    stars.forEach(s => s.style.color = (parseInt(s.dataset.rating) <= selectedRating) ? '#f59e0b' : '#d1d5db');
-                });
-            });
-            document.getElementById('submitRating').addEventListener('click', async () => {
-                if (!selectedRating) return Swal.fire('Select a rating');
-                const comment = document.getElementById('ratingComment').value;
-                await rateDriver(active.id, active.driverId, selectedRating, comment);
-                await updateDoc(doc(db, "requests", active.id), { rated: true });
-                renderCustomerTabs();
-            });
-        }
-
-        // Chat with unread counts
-        if (active.status === 'accepted' || active.status === 'pickedUp') {
-            const chatId = active.id;
-            currentChatId = chatId;
-            loadChat(chatId, true); // true = show badge
-            setTimeout(() => {
-                const miniMapDiv = document.getElementById('activeTripMiniMap');
-                if (miniMapDiv) {
-                    const miniMap = L.map('activeTripMiniMap').setView([active.pickupLatLng.lat, active.pickupLatLng.lng], 12);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
-                    L.marker([active.pickupLatLng.lat, active.pickupLatLng.lng]).addTo(miniMap).bindTooltip('Pickup');
-                    L.marker([active.dropoffLatLng.lat, active.dropoffLatLng.lng]).addTo(miniMap).bindTooltip('Dropoff');
-                    L.polyline([[active.pickupLatLng.lat, active.pickupLatLng.lng], [active.dropoffLatLng.lat, active.dropoffLatLng.lng]], {color: 'var(--primary)', weight: 2}).addTo(miniMap);
-                    if (active.driverId) {
-                        const unsub = onSnapshot(doc(db, "drivers", active.driverId), (snap) => {
-                            if (snap.exists()) {
-                                const loc = snap.data();
-                                L.marker([loc.currentLat, loc.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] }) }).addTo(miniMap).bindTooltip('Driver');
-                                miniMap.setView([loc.currentLat, loc.currentLng], 13);
-                                unsub();
-                            }
-                        });
-                    }
-                }
-            }, 300);
-        }
-    }
-
-    // ---------- CUSTOMER HISTORY (trip numbers) ----------
-    function renderCustomerHistoryTab(container) {
-        const my = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
-        if (!my.length) { container.innerHTML = `<div class="text-center py-8 text-gray-400">No past trips</div>`; return; }
-        container.innerHTML = my.map(r => {
-            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
-            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center">
-                <div>
-                    <span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}
-                    <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
-                </div>
-                <button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button>
-            </div>`;
-        }).join('');
-        document.querySelectorAll('.view-trip').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const trip = allRequests.find(r => r.id === btn.dataset.id);
-                if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
-                    Swal.fire({
-                        title: 'Trip route',
-                        html: `<div id="miniMap" style="height:200px;"></div>`,
-                        didOpen: () => {
-                            setTimeout(() => {
-                                const map = L.map('miniMap').setView([trip.pickupLatLng.lat, trip.pickupLatLng.lng], 12);
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                                L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup');
-                                L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff');
-                                L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], {color: 'var(--primary)', weight: 2}).addTo(map);
-                            }, 100);
-                        }
-                    });
-                }
-            });
-        });
-    }
-
-    // ---------- CHAT with notification badge ----------
-    async function loadChat(requestId, showBadge = false) {
-        if (chatUnsub) chatUnsub();
-        const chatRef = collection(db, "chats", requestId, "messages");
-        const q = query(chatRef, orderBy("timestamp"));
-        const userId = currentUser.uid;
-
-        // Get last read timestamp
-        const readRef = doc(db, "chatReads", requestId);
-        let lastRead = null;
-        try {
-            const readDoc = await getDoc(readRef);
-            if (readDoc.exists() && readDoc.data()[userId]) {
-                lastRead = readDoc.data()[userId].toDate ? readDoc.data()[userId].toDate() : new Date(readDoc.data()[userId]);
-            }
-        } catch(e) {}
-
-        chatUnsub = onSnapshot(q, (snap) => {
-            const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const chatDiv = document.getElementById('chatMessages');
-            if (chatDiv) {
-                chatDiv.innerHTML = messages.map(m =>
-                    `<div class="chat-message"><b>${m.senderName}:</b> ${m.text} <span class="time">${formatTime(m.timestamp)}</span></div>`
-                ).join('');
-                chatDiv.scrollTop = chatDiv.scrollHeight;
-            }
-
-            // Update badge
-            if (showBadge && lastRead !== null) {
-                const unread = messages.filter(m => {
-                    const ts = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
-                    return ts > lastRead && m.senderId !== userId;
-                });
-                const badge = document.getElementById('chatBadge');
-                if (badge) {
-                    if (unread.length > 0) {
-                        badge.innerText = unread.length;
-                        badge.classList.remove('hidden');
-                    } else {
-                        badge.classList.add('hidden');
-                    }
-                }
-            } else {
-                const badge = document.getElementById('chatBadge');
-                if (badge) badge.classList.add('hidden');
-            }
-        });
-
-        // When user opens chat details, mark as read
-        const details = document.getElementById('chatDetails');
-        if (details) {
-            details.addEventListener('toggle', async () => {
-                if (details.open) {
-                    // Mark all as read
-                    await setDoc(readRef, { [userId]: serverTimestamp() }, { merge: true });
-                    const badge = document.getElementById('chatBadge');
-                    if (badge) badge.classList.add('hidden');
-                }
-            });
-        }
-
-        // Send message
-        const sendBtn = document.getElementById('sendChat');
-        const input = document.getElementById('chatInput');
-        if (sendBtn && input) {
-            const newSend = async () => {
-                const text = input.value.trim();
-                if (!text) return;
-                await addDoc(collection(db, "chats", requestId, "messages"), {
-                    senderId: userId,
-                    senderName: currentUser.email,
-                    text,
-                    timestamp: serverTimestamp()
-                });
-                input.value = '';
-                // Mark as read for self
-                await setDoc(readRef, { [userId]: serverTimestamp() }, { merge: true });
-                const badge = document.getElementById('chatBadge');
-                if (badge) badge.classList.add('hidden');
-            };
-            sendBtn.onclick = newSend;
-            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
-        }
-    }
-
-    // ---------- DRIVER DASHBOARD (with chat badge) ----------
-    function renderDriverTabs() {
-        const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
-        const total = completed.reduce((s, r) => s + r.price, 0);
-        const today = new Date().toDateString();
-        const todayEarn = completed.filter(r => r.createdAt?.toDate?.()?.toDateString() === today).reduce((s, r) => s + r.price, 0);
-        document.getElementById('appContainer').innerHTML = `
-            <div class="fade-in">
-                ${renderHeader(`🚚 Driver`, 'logoutDriver')}
-                <div class="grid grid-cols-3 gap-2 mb-4">
-                    <div class="bg-primary-light p-2 rounded-xl text-center" style="background:var(--primary-bg);"><span class="text-xs">Today</span><div class="font-bold">${CURRENCY}${todayEarn}</div></div>
-                    <div class="bg-blue-50 dark:bg-blue-900 p-2 rounded-xl text-center"><span class="text-xs">Week</span><div class="font-bold">${CURRENCY}${completed.filter(r => r.createdAt?.toDate?.() > new Date(Date.now()-7*86400000)).reduce((s,r)=>s+r.price,0)}</div></div>
-                    <div class="bg-amber-50 dark:bg-amber-900 p-2 rounded-xl text-center"><span class="text-xs">Total</span><div class="font-bold">${CURRENCY}${total}</div></div>
-                </div>
-                <div class="flex items-center gap-2 text-sm mb-3"><span>⭐ Rating: ${driverData.averageRating?.toFixed(1) || 'N/A'}</span><span class="bg-green-100 dark:bg-green-900 px-3 py-0.5 rounded-full">${driverData.status}</span></div>
-                <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='map'?'tab-active':''}" data-tab="map">🗺️ Map</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 Available</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 Active trip</button>
-                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 History</button>
-                </div>
-                <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
-            </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { activeTab = btn.dataset.tab; renderDriverTabs(); }));
-        document.getElementById('logoutDriver').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
-        document.getElementById('refreshBtn').onclick = () => { listenRequests(); Swal.fire({ title: 'Refreshed!', icon: 'success', timer: 800, showConfirmButton: false }); };
-        const content = document.getElementById('tabContent');
-        if (activeTab === 'map') renderDriverMapTab(content);
-        else if (activeTab === 'requests') renderDriverAvailableTab(content);
-        else if (activeTab === 'active') renderDriverActiveTab(content);
-        else if (activeTab === 'history') renderDriverHistoryTab(content);
-    }
-
-    function renderDriverMapTab(container) {
-        container.innerHTML = `<div id="driverMap" class="map-container"></div><div class="flex gap-2 mt-2"><button id="gpsBtn" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">📍 Use GPS</button><button id="centerDriverMap" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">🎯 Center</button></div>`;
-        initDriverMap();
-        document.getElementById('gpsBtn').onclick = () => {
-            if (navigator.geolocation) {
-                Swal.fire({ title: 'Getting location...', timer: 2000, didOpen: () => Swal.showLoading() });
-                navigator.geolocation.getCurrentPosition(pos => { updateDriverLoc(pos.coords.latitude, pos.coords.longitude); Swal.close(); });
-            }
-        };
-        document.getElementById('centerDriverMap').onclick = () => driverMap.setView([driverData.currentLat, driverData.currentLng], 14);
-    }
-
-    function initDriverMap() {
-        if (driverMap) { driverMap.remove(); driverMap = null; }
-        driverMap = L.map('driverMap').setView([driverData.currentLat, driverData.currentLng], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(driverMap);
-        driverMarker = L.marker([driverData.currentLat, driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap).bindTooltip('You');
-        window.driverMap = driverMap;
-        const activeId = driverData.activeRequestId;
-        if (activeId) {
-            const trip = allRequests.find(r => r.id === activeId);
-            if (trip && trip.pickupLatLng && trip.dropoffLatLng) {
-                L.marker([trip.pickupLatLng.lat, trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
-                L.marker([trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
-                L.polyline([[trip.pickupLatLng.lat, trip.pickupLatLng.lng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], { color: 'var(--primary)', weight: 2, dashArray: '5,10' }).addTo(driverMap);
-                if (trip.status === 'accepted') {
-                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.pickupLatLng.lat, trip.pickupLatLng.lng]], { color: '#f59e0b', weight: 2, dashArray: '4,8' }).addTo(driverMap);
-                } else if (trip.status === 'pickedUp') {
-                    L.polyline([[driverData.currentLat, driverData.currentLng], [trip.dropoffLatLng.lat, trip.dropoffLatLng.lng]], { color: '#10b981', weight: 2, dashArray: '4,8' }).addTo(driverMap);
-                }
-            }
-        }
-    }
-
-    async function updateDriverLoc(lat, lng) {
-        driverData.currentLat = lat; driverData.currentLng = lng;
-        await updateDoc(doc(db, "drivers", currentUser.uid), { currentLat: lat, currentLng: lng });
-        if (driverMarker) driverMarker.setLatLng([lat, lng]);
-        if (driverMap) driverMap.setView([lat, lng], 13);
-        renderDriverTabs();
-    }
-
-    function renderDriverAvailableTab(container) {
-        const pending = allRequests.filter(r => r.status === 'pending');
-        if (!pending.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No requests available</div>'; return; }
-        container.innerHTML = pending.map(req => {
-            const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
-            return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
-                <div><span class="font-medium">${tripDisplay} (${req.type})</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
-                <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}">Accept</button>
-            </div>`;
-        }).join('');
-        document.querySelectorAll('.acceptReq').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const req = allRequests.find(r => r.id === btn.dataset.id);
-                if (req && req.status === 'pending' && driverData.status !== 'busy') {
-                    const driverSnap = await getDoc(doc(db, "drivers", currentUser.uid));
-                    const drv = driverSnap.data() || {};
-                    await updateDoc(doc(db, "requests", req.id), {
-                        status: 'accepted',
-                        driverId: currentUser.uid,
-                        driverName: currentUser.email,
-                        driverCar: drv.carModel || '',
-                        driverPlate: drv.plate || ''
-                    });
-                    await updateDoc(doc(db, "drivers", currentUser.uid), { activeRequestId: req.id, status: "busy" });
-                    driverData.activeRequestId = req.id; driverData.status = "busy";
-                    renderDriverTabs();
-                    showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
-                } else Swal.fire('Cannot accept', 'You are already busy or the request was taken', 'warning');
-            });
-        });
-    }
-
-    function renderDriverActiveTab(container) {
-        const activeId = driverData.activeRequestId;
-        if (!activeId) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No active trip</div>'; return; }
-        const trip = allRequests.find(r => r.id === activeId);
-        if (!trip) { container.innerHTML = '<div class="text-center py-8 text-gray-400">Loading...</div>'; return; }
-        const distToDropoff = trip.dropoffLatLng ? haversine(driverData.currentLat, driverData.currentLng, trip.dropoffLatLng.lat, trip.dropoffLatLng.lng) : 0;
-        const tripDisplay = trip.tripNumber ? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
-        let progressHtml = '';
-        if (trip.status === 'accepted') {
-            progressHtml = `<div class="progress-step"><span class="dot done"></span> Accepted <span class="progress-line done"></span><span class="dot active"></span> Go to pickup <span class="progress-line"></span><span class="dot"></span> Deliver</div>`;
-        } else if (trip.status === 'pickedUp') {
-            progressHtml = `<div class="progress-step"><span class="dot done"></span> Accepted <span class="progress-line done"></span><span class="dot done"></span> Picked up <span class="progress-line done"></span><span class="dot active"></span> Delivering</div>`;
-        }
-
-        // Chat with badge
-        let chatHtml = `
-            <div class="mt-2"><details id="chatDetails">
-                <summary id="chatSummary">💬 Chat with customer <span id="chatBadge" class="chat-badge hidden">0</span></summary>
-                <div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div>
-                <div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
-            </details></div>`;
-
-        container.innerHTML = `
-            <div class="space-y-3">
-                <div class="flex justify-between"><span class="font-semibold">${tripDisplay}</span><span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span></div>
-                ${progressHtml}
-                <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
-                <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
-                <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
-                <div><span class="text-gray-500">Distance to dropoff:</span> ${distToDropoff.toFixed(2)} km (${estimateTime(distToDropoff)})</div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📍 Move to pickup</button>
-                    <button id="moveToDropoff" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>🏁 Move to dropoff</button>
-                    <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
-                    <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
-                </div>
-                ${chatHtml}
-            </div>`;
-        document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
-        document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
-        document.getElementById('markPicked').onclick = async () => {
-            if (trip.status === 'accepted') {
-                await updateDoc(doc(db, "requests", trip.id), { status: 'pickedUp' });
-                renderDriverTabs();
-                showNotification('Picked up', `You picked up ${trip.customerName}`);
-            }
-        };
-        document.getElementById('markDelivered').onclick = async () => {
-            if (trip.status === 'pickedUp') {
-                await updateDoc(doc(db, "requests", trip.id), { status: 'delivered' });
-                await updateDoc(doc(db, "drivers", currentUser.uid), { activeRequestId: null, status: "online" });
-                driverData.activeRequestId = null; driverData.status = "online";
-                renderDriverTabs();
-                showNotification('Delivered', `Trip completed with ${trip.customerName}`);
-            }
-        };
-        // Load chat with badge
-        if (trip.id) {
-            loadChat(trip.id, true);
-        }
-    }
-
-    function renderDriverHistoryTab(container) {
-        const my = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
-        if (!my.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No completed trips</div>'; return; }
-        container.innerHTML = my.map(r => {
-            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
-            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
-                <div>
-                    <span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span>
-                    <br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>
-                </div>
-                <span class="text-sm text-gray-400">${r.customerName}</span>
-            </div>`;
-        }).join('');
-    }
-
-    // ---------- ADMIN ----------
+    // ---------- ADMIN PANEL ----------
     async function renderAdminPanel() {
-        const usersSnap = await getDocs(collection(db, "users"));
-        const driversSnap = await getDocs(collection(db, "drivers"));
-        const requestsSnap = await getDocs(collection(db, "requests"));
-        const byDay = {};
-        allRequests.forEach(r => { const d = r.createdAt?.toDate?.()?.toDateString() || 'Unknown'; byDay[d] = (byDay[d]||0)+1; });
-        const topDrivers = [];
-        for (const d of driversSnap.docs) {
-            const user = await getDoc(doc(db, "users", d.id));
-            const email = user.exists() ? user.data().email : d.id;
-            const data = d.data();
-            topDrivers.push({ email, rating: data.averageRating || 0, count: data.ratingsCount || 0, car: data.carModel || '', plate: data.plate || '' });
-        }
-        topDrivers.sort((a,b) => b.rating - a.rating);
-
-        document.getElementById('appContainer').innerHTML = `
+        const usersSnap=await getDocs(collection(db,"users"));
+        const driversSnap=await getDocs(collection(db,"drivers"));
+        const requestsSnap=await getDocs(collection(db,"requests"));
+        const foodOrdersSnap=await getDocs(collection(db,"foodOrders"));
+        const byDay={}; allRequests.forEach(r=>{const d=r.createdAt?.toDate?.()?.toDateString()||'Unknown'; byDay[d]=(byDay[d]||0)+1;});
+        const topDrivers=[]; for(const d of driversSnap.docs){const user=await getDoc(doc(db,"users",d.id)); const email=user.exists()?user.data().email:d.id; const data=d.data(); topDrivers.push({email,rating:data.averageRating||0,count:data.ratingsCount||0,car:data.carModel||'',plate:data.plate||''});} topDrivers.sort((a,b)=>b.rating-a.rating);
+        document.getElementById('appContainer').innerHTML=`
             <div class="fade-in">
                 ${renderHeader('👑 Admin', 'adminLogout')}
-                <div class="grid grid-cols-3 gap-4 mb-4"><div class="card text-center p-3">👥 Users<br><span class="text-2xl font-bold">${usersSnap.size}</span></div><div class="card text-center p-3">🚚 Drivers<br><span class="text-2xl font-bold">${driversSnap.size}</span></div><div class="card text-center p-3">📦 Requests<br><span class="text-2xl font-bold">${requestsSnap.size}</span></div></div>
+                <div class="grid grid-cols-4 gap-4 mb-4"><div class="card text-center p-3">👥 Users<br><span class="text-2xl font-bold">${usersSnap.size}</span></div><div class="card text-center p-3">🚚 Drivers<br><span class="text-2xl font-bold">${driversSnap.size}</span></div><div class="card text-center p-3">📦 Rides<br><span class="text-2xl font-bold">${requestsSnap.size}</span></div><div class="card text-center p-3">🍔 Food<br><span class="text-2xl font-bold">${foodOrdersSnap.size}</span></div></div>
                 <div class="card p-4 mb-4"><h3 class="font-semibold">📈 Requests per day</h3><canvas id="requestsChart" height="150"></canvas></div>
-                <div class="card p-4 mb-4"><h3 class="font-semibold">🏆 Top Drivers</h3><ul>${topDrivers.slice(0,5).map(d => `<li>${d.email} – ⭐ ${d.rating.toFixed(1)} (${d.count}) – ${d.car} (${d.plate})</li>`).join('')}</ul></div>
+                <div class="card p-4 mb-4"><h3 class="font-semibold">🏆 Top Drivers</h3><ul>${topDrivers.slice(0,5).map(d=>`<li>${d.email} – ⭐ ${d.rating.toFixed(1)} (${d.count}) – ${d.car} (${d.plate})</li>`).join('')}</ul></div>
                 <div class="card p-4 mb-4"><h3 class="font-semibold">📋 Requests</h3><button id="exportCSV" class="btn-primary text-sm px-3 py-1 mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-48 overflow-auto"></div></div>
                 <div class="card p-4"><h3 class="font-semibold">👤 User Management (demo)</h3><div id="userManagementList"></div></div>
             </div>`;
-        document.querySelectorAll('.theme-dot').forEach(dot => dot.addEventListener('click', () => applyTheme(dot.dataset.theme)));
-        document.getElementById('adminLogout').onclick = async () => { await signOut(auth); currentUser = null; renderLogin(); };
-        document.getElementById('refreshBtn').onclick = () => { listenRequests(); Swal.fire({ title: 'Refreshed!', icon: 'success', timer: 800, showConfirmButton: false }); };
-        new Chart(document.getElementById('requestsChart'), { type: 'line', data: { labels: Object.keys(byDay), datasets: [{ label: 'Requests', data: Object.values(byDay), borderColor: 'var(--primary)' }] } });
-        document.getElementById('adminRequestsList').innerHTML = allRequests.map(r => {
-            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
-            return `<div class="border-b py-1 text-sm">${tripDisplay} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`;
-        }).join('');
-        document.getElementById('exportCSV').onclick = () => {
-            const headers = ['Trip Number','ID','Type','Status','Price','Customer','Driver','Driver Car','Driver Plate','Payment','Created','Pickup Address','Dropoff Address'];
-            const rows = allRequests.map(r => [
-                r.tripNumber || '',
-                r.id,
-                r.type,
-                r.status,
-                r.price,
-                r.customerName,
-                r.driverName||'',
-                r.driverCar||'',
-                r.driverPlate||'',
-                r.paymentMethod,
-                r.createdAt?.toDate?.()?.toISOString()||'',
-                r.pickupAddress || '',
-                r.dropoffAddress || ''
-            ]);
-            const csv = [headers, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
-            const blob = new Blob([csv], {type: 'text/csv'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'logimove_requests.csv'; a.click();
-            Swal.fire('Exported!');
+        document.querySelectorAll('.theme-dot').forEach(d=>d.addEventListener('click',()=>applyTheme(d.dataset.theme)));
+        document.getElementById('adminLogout').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
+        document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
+        document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderAdminPanel();};
+        new Chart(document.getElementById('requestsChart'),{type:'line',data:{labels:Object.keys(byDay),datasets:[{label:'Requests',data:Object.values(byDay),borderColor:'var(--primary)'}]}});
+        document.getElementById('adminRequestsList').innerHTML=allRequests.map(r=>{const td=r.tripNumber?`#${r.tripNumber}`:`#${r.id.substring(0,6)}`; return `<div class="border-b py-1 text-sm">${td} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`;}).join('');
+        document.getElementById('exportCSV').onclick=()=>{
+            const headers=['Trip Number','ID','Type','Status','Price','Customer','Driver','Car','Plate','Payment','Created','Pickup Address','Dropoff Address'];
+            const rows=allRequests.map(r=>[r.tripNumber||'',r.id,r.type,r.status,r.price,r.customerName,r.driverName||'',r.driverCar||'',r.driverPlate||'',r.paymentMethod,r.createdAt?.toDate?.()?.toISOString()||'',r.pickupAddress||'',r.dropoffAddress||'']);
+            const csv=[headers,...rows].map(row=>row.map(c=>`"${c}"`).join(',')).join('\n');
+            const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='logimove_requests.csv'; a.click(); Swal.fire('Exported!');
         };
-        const userMgmt = document.getElementById('userManagementList');
-        const allUsers = await getDocs(collection(db, "users"));
-        userMgmt.innerHTML = '';
-        for (const u of allUsers.docs) {
-            const data = u.data();
-            userMgmt.innerHTML += `<div class="border-b py-1 flex justify-between"><span>${data.email} (${data.role})</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset</button></div></div>`;
-        }
-        document.querySelectorAll('.suspendBtn').forEach(b => b.addEventListener('click', () => Swal.fire('Demo', 'Suspend action (simulated)', 'info')));
-        document.querySelectorAll('.resetBtn').forEach(b => b.addEventListener('click', () => Swal.fire('Demo', 'Reset password email (simulated)', 'info')));
+        const userMgmt=document.getElementById('userManagementList');
+        const allUsers=await getDocs(collection(db,"users"));
+        userMgmt.innerHTML='';
+        for(const u of allUsers.docs){const data=u.data(); userMgmt.innerHTML+=`<div class="border-b py-1 flex justify-between"><span>${data.email} (${data.role})</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset</button></div></div>`;}
+        document.querySelectorAll('.suspendBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Suspend action (simulated)','info')));
+        document.querySelectorAll('.resetBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Reset password email (simulated)','info')));
     }
 
     // ---------- BOOT ----------
