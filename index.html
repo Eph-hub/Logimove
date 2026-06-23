@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>LogiMoves-Zm</title>
+    <title>LogiMoves Zm</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
-    <!-- Leaflet & Routing -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -46,14 +45,11 @@
         .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary); }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
-        .map-container { height: 260px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
+        .map-container { height: 280px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
         input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.6rem 1rem; width: 100%; font-size: 0.9rem; transition: border 0.2s; color: var(--text); }
         input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
         .header-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1.1rem; }
         .rating-badge { background: rgba(251,191,36,0.15); color: #fbbf24; padding: 0.1rem 0.6rem; border-radius: 2rem; font-size: 0.7rem; font-weight: 600; }
-        .service-chip { padding: 0.4rem 1rem; border-radius: 2rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.2s; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; }
-        .service-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .service-chip:hover { transform: scale(1.05); }
         .loc-card { background: var(--bg); border: 2px solid var(--border); border-radius: 1rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; transition: border 0.2s; }
         .loc-card.active-pickup { border-color: #10b981; }
         .loc-card.active-dropoff { border-color: #3b82f6; }
@@ -81,7 +77,10 @@
         .theme-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; margin: 4px; }
         .theme-dot:hover { border-color: var(--text); }
         .theme-dot.active { border-color: var(--text); }
-        @media (max-width: 640px) { .map-container { height: 200px; } .service-chip { font-size: 0.7rem; padding: 0.3rem 0.7rem; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } }
+        .where-to-big { font-size: 1.2rem; font-weight: 600; padding: 0.8rem 1.2rem; border-radius: 2rem; background: var(--bg); border: 1px solid var(--border); width: 100%; color: var(--text); }
+        .where-to-big::placeholder { color: var(--text-secondary); }
+        .where-to-big:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+        @media (max-width: 640px) { .map-container { height: 200px; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } }
     </style>
 </head>
 <body>
@@ -162,11 +161,11 @@
 
     // ---------- AUTH ----------
     async function saveUserToFirestore(user, role, name, extra={}) {
-        await setDoc(doc(db, "users", user.uid),{email:user.email, name, role,createdAt:serverTimestamp()});
+        await setDoc(doc(db,"users",user.uid),{email:user.email,name,role,createdAt:serverTimestamp()});
         if(role==='driver') {
             await setDoc(doc(db,"drivers",user.uid),{
                 currentLat:-15.3875,currentLng:28.3228,
-                status: "online",activeRequestId: null,
+                status:"online",activeRequestId:null,
                 averageRating:0,ratingsCount:0,
                 phone:extra.phone||'',
                 carModel:extra.carModel||'',
@@ -265,7 +264,6 @@
         document.documentElement.style.setProperty('--primary-ring',t.primary+'40');
         localStorage.setItem('theme',name);
         currentTheme=name;
-        // Update active class on any theme dots in the DOM
         document.querySelectorAll('.theme-dot').forEach(d=>d.classList.toggle('active',d.dataset.theme===name));
     }
     applyTheme(currentTheme);
@@ -279,7 +277,7 @@
                         <i class="fas fa-truck-fast text-4xl" style="color:var(--primary);"></i>
                     </div>
                     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Logi<span style="color:var(--primary);">Moves</span> <span style="color:var(--primary);">Zm</span></h1>
-                    <p class="text-gray-500 dark:text-gray-300 text-sm mb-6"> Rides • Delivery • Food</p>
+                    <p class="text-gray-500 dark:text-gray-300 text-sm mb-6">Zambia • Ride • Delivery • Food</p>
                     <input type="email" id="loginEmail" placeholder="Email" class="mb-3">
                     <input type="password" id="loginPassword" placeholder="Password" class="mb-3">
                     <button id="loginBtn" class="btn-primary w-full">Login</button>
@@ -348,10 +346,10 @@
         else renderDriverTabs();
     }
 
-    // ---------- HEADER (no theme dots) ----------
+    // ---------- HEADER ----------
     function renderHeader(title, logoutId) {
         return `
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-3">
                     <div class="header-avatar">${currentUser?.email?.charAt(0).toUpperCase() || 'U'}</div>
                     <div>
@@ -406,13 +404,11 @@
             html: html,
             confirmButtonText: 'Close',
             didOpen: () => {
-                // Attach theme dot events inside modal
                 const modalContent = document.getElementById('swal2-content');
                 if (modalContent) {
                     modalContent.querySelectorAll('.theme-dot').forEach(d => {
                         d.addEventListener('click', () => {
                             applyTheme(d.dataset.theme);
-                            // Update active class inside modal
                             modalContent.querySelectorAll('.theme-dot').forEach(dd => {
                                 dd.classList.toggle('active', dd.dataset.theme === currentTheme);
                             });
@@ -431,19 +427,14 @@
         });
     }
 
-    // ---------- CUSTOMER DASHBOARD ----------
+    // ============================================================
+    // =============== SIMPLIFIED CUSTOMER DASHBOARD ==============
+    // ============================================================
     function renderCustomerTabs() {
         document.getElementById('appContainer').innerHTML = `
             <div class="fade-in">
-                ${renderHeader(`👤 ${currentUser.email}`, 'logoutBtn')}
-                <div class="flex gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar">
-                    ${['Delivery','Food','Shops','Cargo','Navigation','Rides'].map(s => {
-                        const tabMap = { 'Delivery':'map', 'Food':'food', 'Shops':'shops', 'Cargo':'cargo', 'Navigation':'navigation', 'Rides':'rides' };
-                        const isActive = activeTab === tabMap[s];
-                        return `<button class="service-chip ${isActive?'active':''}" data-service="${tabMap[s]}">${s}</button>`;
-                    }).join('')}
-                </div>
-                <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
+                ${renderHeader(``, 'logoutBtn')}
+                <div id="tabContent">Loading...</div>
             </div>`;
         // Bind events
         document.getElementById('driverModeToggle').onclick = async () => {
@@ -479,46 +470,40 @@
             const btn = document.getElementById('hamburgerBtn');
             if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.classList.remove('open');
         });
-        // Service chips
-        document.querySelectorAll('.service-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                const tab = chip.dataset.service;
-                activeTab = tab;
-                renderCustomerTabs();
-            });
-        });
         document.getElementById('logoutBtn').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
         const content=document.getElementById('tabContent');
-        switch(activeTab) {
-            case 'map': renderCustomerMapTab(content); break;
-            case 'food': renderCustomerFoodTab(content); break;
-            case 'shops': renderCustomerShopsTab(content); break;
-            case 'cargo': renderCustomerCargoTab(content); break;
-            case 'navigation': renderCustomerNavigationTab(content); break;
-            case 'rides': renderCustomerRidesTab(content); break;
-            case 'history': renderCustomerHistoryTab(content); break;
-            default: renderCustomerMapTab(content);
+        if (activeTab === 'map' || activeTab === undefined || !activeTab) {
+            renderSimplifiedMapTab(content);
+        } else {
+            // Other tabs (food, shops, etc.) render separately
+            switch(activeTab) {
+                case 'food': renderCustomerFoodTab(content); break;
+                case 'shops': renderCustomerShopsTab(content); break;
+                case 'cargo': renderCustomerCargoTab(content); break;
+                case 'navigation': renderCustomerNavigationTab(content); break;
+                case 'rides': renderSimplifiedRidesTab(content); break;
+                case 'history': renderCustomerHistoryTab(content); break;
+                default: renderSimplifiedMapTab(content);
+            }
         }
         updateNewOrderBadge();
     }
 
-    // ---------- CUSTOMER MAP TAB ----------
-    function renderCustomerMapTab(container) {
+    // =============== SIMPLIFIED MAP TAB (no service chips) ===============
+    function renderSimplifiedMapTab(container) {
         serviceType = 'delivery';
         const html = `
             <div class="space-y-3">
-                <div class="flex gap-2 flex-wrap">
-                    <button id="serviceDelivery" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='delivery'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button>
-                    <button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button>
-                </div>
+                <!-- Big "Where to?" search -->
                 <div class="relative">
-                    <input type="text" id="mainSearchInput" placeholder="Where to?" class="pr-24 text-base font-medium" autocomplete="off">
-                    <span id="mainSearchTime" class="absolute right-3 top-2.5 text-xs text-gray-400">—</span>
+                    <input type="text" id="mainSearchInput" placeholder="Where to &amp; for how much?" class="where-to-big" autocomplete="off">
                     <div id="mainSearchDropdown" class="autocomplete-dropdown"></div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                <!-- Location cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div class="loc-card active-pickup" id="pickupCard">
                         <span class="icon">📍</span>
                         <input type="text" id="pickupInput" placeholder="Pickup" class="flex-1 text-sm" autocomplete="off">
@@ -532,22 +517,32 @@
                         <div id="dropoffDropdown" class="autocomplete-dropdown"></div>
                     </div>
                 </div>
+
+                <!-- Action buttons -->
                 <div class="flex flex-wrap gap-2">
                     <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
-                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                     <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
+
+                <!-- Saved & Recent -->
                 <div id="savedPlacesContainer">
                     <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
                     <div id="recentPlacesList" class="flex flex-wrap gap-1 mt-1"></div>
                 </div>
+
+                <!-- Map -->
                 <div id="customerMap" class="map-container"></div>
+
+                <!-- Price & Route -->
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
                     <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
                     <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
                     <div id="fareBreakdown" class="text-xs"></div>
                 </div>
+
+                <!-- Cargo & Payment -->
                 <div class="grid grid-cols-2 gap-2">
                     <select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select>
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
@@ -559,28 +554,23 @@
         attachMapEvents(container);
     }
 
-    // ---------- RIDES TAB ----------
-    function renderCustomerRidesTab(container) {
+    // =============== SIMPLIFIED RIDES TAB ===============
+    function renderSimplifiedRidesTab(container) {
         serviceType = 'taxi';
         const html = `
             <div class="space-y-3">
-                <div class="flex gap-2 flex-wrap">
-                    <button id="serviceDelivery" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='delivery'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">📦 Delivery</button>
-                    <button id="serviceTaxi" class="px-4 py-1 rounded-full text-sm font-medium ${serviceType==='taxi'?'bg-primary text-white':'bg-gray-200 dark:bg-gray-700'}">🚖 Taxi</button>
-                </div>
                 <div class="relative">
-                    <input type="text" id="mainSearchInput" placeholder="Where to?" class="pr-24 text-base font-medium" autocomplete="off">
-                    <span id="mainSearchTime" class="absolute right-3 top-2.5 text-xs text-gray-400">—</span>
+                    <input type="text" id="mainSearchInput" placeholder="Where to &amp; for how much?" class="where-to-big" autocomplete="off">
                     <div id="mainSearchDropdown" class="autocomplete-dropdown"></div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
                     <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
-                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                     <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
                 <div id="savedPlacesContainer"><div id="savedPlacesList" class="flex flex-wrap gap-1"></div><div id="recentPlacesList" class="flex flex-wrap gap-1 mt-1"></div></div>
                 <div id="customerMap" class="map-container"></div>
@@ -605,17 +595,16 @@
     function attachMapEvents(container) {
         const mainInput = document.getElementById('mainSearchInput');
         const mainDropdown = document.getElementById('mainSearchDropdown');
-        const mainTime = document.getElementById('mainSearchTime');
         const pickupInput = document.getElementById('pickupInput');
         const dropoffInput = document.getElementById('dropoffInput');
         const pickupDropdown = document.getElementById('pickupDropdown');
         const dropoffDropdown = document.getElementById('dropoffDropdown');
 
-        async function performSearch(input, dropdown, mode, timeEl) {
+        async function performSearch(input, dropdown, mode) {
             const query = input.value.trim();
-            if (query.length < 2) { dropdown.style.display = 'none'; if (timeEl) timeEl.textContent = '—'; return; }
+            if (query.length < 2) { dropdown.style.display = 'none'; return; }
             const results = await searchAddress(query);
-            if (!results.length) { dropdown.style.display = 'none'; if (timeEl) timeEl.textContent = '—'; return; }
+            if (!results.length) { dropdown.style.display = 'none'; return; }
             dropdown.innerHTML = results.map(r => {
                 let time = '—';
                 const loc = mode === 'pickup' ? tempDropoff : tempPickup;
@@ -628,7 +617,6 @@
                     const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng), name = el.dataset.name;
                     setLocationForMode(mode, { lat, lng }, name);
                     input.value = name;
-                    if (timeEl) timeEl.textContent = el.querySelector('.time')?.textContent || '—';
                     dropdown.style.display = 'none';
                     if (mode === 'pickup') pickupInput.value = name;
                     else dropoffInput.value = name;
@@ -641,16 +629,14 @@
             return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
         }
 
-        const debouncedMain = debounce(() => {
-            const q = mainInput.value.trim();
-            if (q.length < 2) { mainDropdown.style.display = 'none'; mainTime.textContent = '—'; return; }
-            performSearch(mainInput, mainDropdown, mapSelectMode, mainTime);
-        }, 300);
-
+        // Main search uses active mode
+        const debouncedMain = debounce(() => performSearch(mainInput, mainDropdown, mapSelectMode), 300);
         mainInput.addEventListener('input', debouncedMain);
-        pickupInput.addEventListener('input', debounce(() => { setActiveMode('pickup'); performSearch(pickupInput, pickupDropdown, 'pickup', null); }, 300));
-        dropoffInput.addEventListener('input', debounce(() => { setActiveMode('dropoff'); performSearch(dropoffInput, dropoffDropdown, 'dropoff', null); }, 300));
 
+        pickupInput.addEventListener('input', debounce(() => { setActiveMode('pickup'); performSearch(pickupInput, pickupDropdown, 'pickup'); }, 300));
+        dropoffInput.addEventListener('input', debounce(() => { setActiveMode('dropoff'); performSearch(dropoffInput, dropoffDropdown, 'dropoff'); }, 300));
+
+        // Clear buttons
         document.getElementById('clearPickupInput').addEventListener('click', () => {
             pickupInput.value = ''; mainInput.value = '';
             tempPickup = null; tempPickupAddress = null;
@@ -671,6 +657,7 @@
         document.getElementById('pickupCard').addEventListener('click', () => setActiveMode('pickup'));
         document.getElementById('dropoffCard').addEventListener('click', () => setActiveMode('dropoff'));
 
+        // My location
         document.getElementById('useMyLocation').addEventListener('click', () => {
             haptic();
             if (navigator.geolocation) {
@@ -686,6 +673,7 @@
             } else Swal.fire('Error', 'Geolocation not supported', 'error');
         });
 
+        // Swap
         document.getElementById('swapLocations').addEventListener('click', () => {
             const tempP = tempPickup, tempA = tempPickupAddress;
             tempPickup = tempDropoff; tempPickupAddress = tempDropoffAddress;
@@ -702,6 +690,7 @@
             Swal.fire({ title: 'Swapped!', icon: 'info', timer: 800, showConfirmButton: false });
         });
 
+        // Save location
         document.getElementById('saveLocationBtn').addEventListener('click', async () => {
             haptic();
             const mode = mapSelectMode;
@@ -716,9 +705,7 @@
             Swal.fire({ title: 'Saved!', icon: 'success', timer: 1000 });
         });
 
-        document.getElementById('serviceDelivery').onclick = () => { serviceType = 'delivery'; renderCustomerTabs(); };
-        document.getElementById('serviceTaxi').onclick = () => { serviceType = 'taxi'; renderCustomerTabs(); };
-
+        // Publish
         document.getElementById('publishBtn').onclick = async () => {
             haptic();
             if (!tempPickup || !tempDropoff) return Swal.fire('Error','Set both pickup and dropoff','warning');
@@ -1288,7 +1275,6 @@
             item.addEventListener('click', () => {
                 const tab = item.dataset.tab;
                 if (tab === 'profile') { showProfileModal(); return; }
-                // For driver, we switch the active tab within driver dashboard
                 activeTab = tab;
                 renderDriverTabs();
                 document.getElementById('dropdownMenu').classList.remove('open');
