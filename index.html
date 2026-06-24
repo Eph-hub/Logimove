@@ -181,7 +181,7 @@
     let currentUser = null, currentRole = null;
     let tempPickup = null, tempDropoff = null;
     let tempPickupAddress = null, tempDropoffAddress = null;
-    let serviceType = "delivery";
+    let serviceType = "taxi"; // default to taxi (rides)
     let customerMap, driverMap;
     let pickupMarker, dropoffMarker, driverMarker;
     let savedPlaces = [];
@@ -194,8 +194,7 @@
     let mapSelectMode = "pickup";
     let fcmToken = null;
     let chatUnsub = null;
-    // ===== PRIORITIZE RIDE PAGE AS HOME =====
-    let activeTab = 'rides'; // Changed from 'map'
+    let activeTab = 'rides'; // home is rides
     let seenRequestIds = new Set();
     let newOrderCount = 0;
     let driverPosUnsub = null;
@@ -445,12 +444,10 @@
         if (currentRole === 'customer') {
             tabs = [
                 { id: 'rides', icon: 'fa-taxi', label: 'Rides' },
-                { id: 'map', icon: 'fa-map-marker-alt', label: 'Map' },
                 { id: 'food', icon: 'fa-utensils', label: 'Food' },
                 { id: 'shops', icon: 'fa-store', label: 'Shops' },
                 { id: 'cargo', icon: 'fa-box', label: 'Cargo' },
-                { id: 'navigation', icon: 'fa-directions', label: 'Navigation' },
-                { id: 'history', icon: 'fa-history', label: 'History' },
+                { id: 'history', icon: 'fa-history', label: 'History' }
             ];
         } else if (currentRole === 'driver') {
             tabs = [
@@ -658,84 +655,23 @@
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
         const content=document.getElementById('tabContent');
-        // ===== RIDE PAGE PRIORITIZED AS HOME =====
+        // Only Rides, Food, Shops, Cargo, History remain
         if (activeTab === 'rides') {
-            renderSimplifiedRidesTab(content);
-        } else if (activeTab === 'map') {
-            renderSimplifiedMapTab(content);
+            renderRidesTab(content);
         } else {
             switch(activeTab) {
                 case 'food': renderCustomerFoodTab(content); break;
                 case 'shops': renderCustomerShopsTab(content); break;
                 case 'cargo': renderCustomerCargoTab(content); break;
-                case 'navigation': renderCustomerNavigationTab(content); break;
                 case 'history': renderCustomerHistoryTab(content); break;
-                default: renderSimplifiedRidesTab(content);
+                default: renderRidesTab(content);
             }
         }
         updateNewOrderBadge();
     }
 
-    // =============== SIMPLIFIED MAP TAB (with Search button) ===============
-    function renderSimplifiedMapTab(container) {
-        serviceType = 'delivery';
-        searchPerformed = false;
-        const html = `
-            <div class="space-y-3">
-                <!-- Location cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div class="loc-card active-pickup" id="pickupCard">
-                        <span class="icon">📍</span>
-                        <input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off">
-                        <span class="clear-btn" id="clearPickupInput">✕</span>
-                        <div id="pickupDropdown" class="autocomplete-dropdown"></div>
-                    </div>
-                    <div class="loc-card" id="dropoffCard">
-                        <span class="icon">🏁</span>
-                        <input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off">
-                        <span class="clear-btn" id="clearDropoffInput">✕</span>
-                        <div id="dropoffDropdown" class="autocomplete-dropdown"></div>
-                    </div>
-                </div>
-
-                <!-- Action buttons -->
-                <div class="flex flex-wrap gap-2">
-                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
-                    <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
-                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
-                </div>
-
-                <!-- Saved Places (only saved) -->
-                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
-
-                <!-- Search button (new) -->
-                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
-
-                <!-- Map -->
-                <div id="customerMap" class="map-container"></div>
-
-                <!-- Price & Route (updated by Search) -->
-                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
-                    <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
-                    <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
-                    <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
-                    <div id="fareBreakdown" class="text-xs"></div>
-                </div>
-
-                <!-- Cargo & Payment -->
-                <div class="grid grid-cols-2 gap-2">
-                    <select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select>
-                    <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
-                </div>
-                <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request</button>
-            </div>`;
-        container.innerHTML = html;
-        attachMapEvents(container);
-    }
-
-    // =============== SIMPLIFIED RIDES TAB ===============
-    function renderSimplifiedRidesTab(container) {
+    // =============== RIDES TAB (Home) – integrated map ===============
+    function renderRidesTab(container) {
         serviceType = 'taxi';
         searchPerformed = false;
         const html = `
@@ -759,7 +695,7 @@
                     <div id="fareBreakdown" class="text-xs"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <select id="cargoSelect" class="text-sm">${serviceType==='delivery'?'<option>Package</option><option>Box</option><option>Furniture</option>':'<option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option>'}</select>
+                    <select id="cargoSelect" class="text-sm"><option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option></select>
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
@@ -769,7 +705,7 @@
         attachMapEvents(container);
     }
 
-    // ---------- SHARED MAP EVENTS ----------
+    // ---------- SHARED MAP EVENTS (used by Rides and Cargo) ----------
     function attachMapEvents(container) {
         const pickupInput = document.getElementById('pickupInput');
         const dropoffInput = document.getElementById('dropoffInput');
@@ -1104,7 +1040,6 @@
     // =============== FULLY FUNCTIONAL FOOD TAB ==================
     // ============================================================
     function renderCustomerFoodTab(container) {
-        // If a previous listener exists, detach it
         if (foodOrdersUnsubscribe) {
             foodOrdersUnsubscribe();
             foodOrdersUnsubscribe = null;
@@ -1191,7 +1126,6 @@
                 </div>
             `;
 
-            // ---- View Menu buttons ----
             document.querySelectorAll('.view-menu-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const card = e.target.closest('.restaurant-card');
@@ -1256,7 +1190,6 @@
                 });
             });
 
-            // ---- Cart UI update ----
             const updateCartUI = () => {
                 const countSpan = document.getElementById('cartCount');
                 const itemsDiv = document.getElementById('cartItems');
@@ -1294,7 +1227,6 @@
                 }
             };
 
-            // ---- Checkout ----
             document.getElementById('checkoutFoodBtn').addEventListener('click', async () => {
                 if (foodCart.length === 0) return Swal.fire('Cart empty', 'Add some items first.', 'info');
 
@@ -1339,7 +1271,6 @@
                 }
             });
 
-            // ---- Real‑time food order listener ----
             const q = query(
                 collection(db, "foodOrders"),
                 where("customerId", "==", currentUser.uid),
@@ -1350,7 +1281,6 @@
                 updateOrderHistory();
             });
 
-            // Initial cart render
             updateCartUI();
         };
 
@@ -1389,6 +1319,7 @@
 
     // ---------- CARGO TAB ----------
     function renderCustomerCargoTab(container) {
+        serviceType = 'delivery'; // override to delivery for cargo
         const html = `
             <h3 class="text-xl font-bold mb-3">📦 Cargo Request</h3>
             <div class="space-y-3">
@@ -1397,91 +1328,41 @@
                     <div><label class="text-sm font-medium">Weight (kg)</label><input type="number" id="cargoWeight" placeholder="e.g. 50" class="mt-1"></div>
                     <div><label class="text-sm font-medium">Dimensions (LxWxH cm)</label><input type="text" id="cargoDims" placeholder="e.g. 100x50x60" class="mt-1"></div>
                 </div>
-                <div><label class="text-sm font-medium">Pickup location</label><input type="text" id="cargoPickup" placeholder="Enter pickup address" class="mt-1"></div>
-                <div><label class="text-sm font-medium">Dropoff location</label><input type="text" id="cargoDropoff" placeholder="Enter dropoff address" class="mt-1"></div>
-                <button id="cargoSubmit" class="btn-primary w-full">Request Cargo Transport</button>
-                <div id="cargoMap" class="map-container mt-2"></div>
-            </div>
-        `;
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
+                    <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
+                    <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
+                </div>
+                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
+                <div id="cargoMap" class="map-container"></div>
+                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
+                    <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
+                    <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
+                    <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
+                    <div id="fareBreakdown" class="text-xs"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="cargoSelect" class="text-sm"><option>Package</option><option>Box</option><option>Furniture</option></select>
+                    <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
+                </div>
+                <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
+                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request Cargo</button>
+            </div>`;
         container.innerHTML = html;
-        const map = L.map('cargoMap').setView([-15.3875, 28.3228], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        document.getElementById('cargoSubmit').addEventListener('click', () => {
-            const desc = document.getElementById('cargoDesc').value;
-            const weight = document.getElementById('cargoWeight').value;
-            const dims = document.getElementById('cargoDims').value;
-            const pickup = document.getElementById('cargoPickup').value;
-            const dropoff = document.getElementById('cargoDropoff').value;
-            if (!desc || !pickup || !dropoff) return Swal.fire('Please fill all required fields');
-            Swal.fire({ title: 'Cargo request sent!', text: `Item: ${desc}, Weight: ${weight}kg, Dims: ${dims}`, icon: 'success', timer: 2000 });
-            showNotification('Cargo request', 'Drivers will see your cargo');
-        });
-    }
-
-    // ---------- NAVIGATION TAB ----------
-    function renderCustomerNavigationTab(container) {
-        const html = `
-            <h3 class="text-xl font-bold mb-3">🧭 Navigation</h3>
-            <div class="relative">
-                <input type="text" id="navDestination" placeholder="Enter destination" class="pr-10" autocomplete="off">
-                <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
-                <div id="navDropdown" class="autocomplete-dropdown"></div>
-            </div>
-            <button id="navGo" class="btn-primary w-full mt-2">Go</button>
-            <div id="navMap" class="map-container mt-2"></div>
-            <div id="navInfo" class="text-sm mt-2"></div>
-        `;
-        container.innerHTML = html;
-
-        const map = L.map('navMap').setView([-15.3875, 28.3228], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        let routingControlNav = null;
-        let startLoc = { lat: -15.3875, lng: 28.3228 };
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                startLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                map.setView([startLoc.lat, startLoc.lng], 13);
-            }, () => {});
-        }
-        const navInput = document.getElementById('navDestination');
-        const navDropdown = document.getElementById('navDropdown');
-        let timeout;
-        navInput.addEventListener('input', () => {
-            clearTimeout(timeout);
-            const q = navInput.value.trim();
-            if (q.length < 2) { navDropdown.style.display = 'none'; return; }
-            timeout = setTimeout(async () => {
-                const res = await searchAddress(q);
-                if (!res.length) { navDropdown.style.display = 'none'; return; }
-                navDropdown.innerHTML = res.map(r => `<div class="autocomplete-item" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${r.display_name}"><span>${r.display_name}</span></div>`).join('');
-                navDropdown.style.display = 'block';
-                navDropdown.querySelectorAll('.autocomplete-item').forEach(el => {
-                    el.addEventListener('click', () => {
-                        navInput.value = el.dataset.name;
-                        navDropdown.style.display = 'none';
-                        window._navDest = { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng), name: el.dataset.name };
-                    });
-                });
-            }, 400);
-        });
-        document.addEventListener('click', (e) => {
-            if (!navInput.contains(e.target) && !navDropdown.contains(e.target)) navDropdown.style.display = 'none';
-        });
-
-        document.getElementById('navGo').addEventListener('click', () => {
-            const dest = window._navDest;
-            if (!dest) return Swal.fire('Please select a destination from suggestions');
-            if (routingControlNav) map.removeControl(routingControlNav);
-            routingControlNav = L.Routing.control({
-                waypoints: [L.latLng(startLoc.lat, startLoc.lng), L.latLng(dest.lat, dest.lng)],
-                routeWhileDragging: false,
-                showAlternatives: false,
-                lineOptions: { styles: [{ color: 'var(--primary)', weight: 4 }] },
-                createMarker: function() { return null; }
-            }).addTo(map);
-            const dist = haversine(startLoc.lat, startLoc.lng, dest.lat, dest.lng);
-            document.getElementById('navInfo').innerHTML = `Distance: ${dist.toFixed(2)} km, ETA: ${estimateTime(dist)}`;
-        });
+        // Reuse the same map events but with a different map id
+        const origMap = document.getElementById('customerMap');
+        if (origMap) origMap.id = 'cargoMap'; // ensure we use the cargo map container
+        // But the attachMapEvents expects 'customerMap' id, so we need to adjust.
+        // We'll temporarily rename the id to 'customerMap' for the events to work.
+        const cargoMapEl = document.getElementById('cargoMap');
+        if (cargoMapEl) cargoMapEl.id = 'customerMap';
+        attachMapEvents(container);
+        // Restore id after attach? Not necessary as we only use once.
     }
 
     // ---------- HISTORY TAB ----------
@@ -1519,7 +1400,7 @@
         getFoodOrders();
     }
 
-    // ========== DRIVER DASHBOARD ==========
+    // ========== DRIVER DASHBOARD (unchanged) ==========
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         const total = completed.reduce((s,r) => s + r.price, 0);
@@ -1542,7 +1423,6 @@
                 </div>
                 <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
             </div>`;
-        // Bind events
         document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
             activeTab=btn.dataset.tab;
             if (activeTab === 'requests') resetNewOrderBadge();
@@ -1560,12 +1440,10 @@
 
         const dropdownMenu = document.getElementById('dropdownMenu');
         const hamburgerBtn = document.getElementById('hamburgerBtn');
-
         hamburgerBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             dropdownMenu?.classList.toggle('open');
         });
-
         document.addEventListener('click', (e) => {
             if (dropdownMenu && hamburgerBtn && 
                 !dropdownMenu.contains(e.target) && 
@@ -1573,7 +1451,6 @@
                 dropdownMenu.classList.remove('open');
             }
         });
-
         dropdownMenu?.querySelectorAll('[data-tab]').forEach(item => {
             item.addEventListener('click', (e) => {
                 const tab = item.dataset.tab;
