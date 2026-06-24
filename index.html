@@ -102,7 +102,6 @@
         .new-order-badge { background: #ef4444; color: white; border-radius: 50%; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: bold; margin-left: 4px; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-        /* ---- Improved dropdown styles ---- */
         .dropdown-menu {
             transition: opacity 0.2s ease, transform 0.2s ease;
             opacity: 0;
@@ -150,6 +149,11 @@
         .theme-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; margin: 4px; }
         .theme-dot:hover { border-color: var(--text); }
         .theme-dot.active { border-color: var(--text); }
+
+        /* Tracking link button */
+        .tracking-link { background: var(--primary-bg); color: var(--primary); padding: 0.1rem 0.6rem; border-radius: 2rem; font-size: 0.65rem; cursor: pointer; border: 1px solid var(--primary); }
+        .tracking-link:hover { background: var(--primary); color: white; }
+
         @media (max-width: 640px) { .map-container { height: 200px; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } }
     </style>
 </head>
@@ -160,7 +164,7 @@
     // ---------- FIREBASE IMPORTS ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, getDocs, where, runTransaction, increment, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
     const firebaseConfig = {
@@ -181,10 +185,11 @@
     let currentUser = null, currentRole = null;
     let tempPickup = null, tempDropoff = null;
     let tempPickupAddress = null, tempDropoffAddress = null;
-    let serviceType = "taxi"; // default to taxi (rides)
+    let serviceType = "taxi";
     let customerMap, driverMap;
     let pickupMarker, dropoffMarker, driverMarker;
     let savedPlaces = [];
+    let defaultHome = null, defaultWork = null;
     let allRequests = [];
     let allRestaurants = [];
     let foodCart = [];
@@ -194,7 +199,7 @@
     let mapSelectMode = "pickup";
     let fcmToken = null;
     let chatUnsub = null;
-    let activeTab = 'rides'; // home is rides
+    let activeTab = 'rides';
     let seenRequestIds = new Set();
     let newOrderCount = 0;
     let driverPosUnsub = null;
@@ -202,26 +207,53 @@
     let customerRouteLine = null;
     let routingControl = null;
     let searchPerformed = false;
-
-    // Food listener cleanup
     let foodOrdersUnsubscribe = null;
+    const foodTrackingUnsubs = {};
 
-    const RATES = { taxi: { base: 20, perKm: 5 }, delivery: { base: 30, perKm: 10 } };
+    // Promo codes
+    let activePromo = null;
+    const PROMO_CODES = { 'SAVE10': 0.10, 'SAVE20': 0.20, 'FREE': 0.00 };
+
+    const RATES = { taxi: { base: 20, perKm: 5 }, delivery: { base: 30, perKm: 10 }, cargo: { base: 50, perKm: 15 } };
     const CURRENCY = "K";
     const PAYMENT_METHODS = ["Cash on Delivery", "Airtel Money", "MTN Money", "Zamtel Pay", "Card"];
+    const VEHICLES = ['Car', 'Bike', 'Truck'];
 
     // ---------- HELPERS ----------
     function formatDate(t) { if (!t) return 'Unknown'; const d = t.toDate ? t.toDate() : new Date(t); return d.toLocaleDateString('en-ZM',{day:'2-digit',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('en-ZM',{hour:'2-digit',minute:'2-digit'}); }
     function formatTime(t) { if (!t) return ''; const d = t.toDate ? t.toDate() : new Date(t); return d.toLocaleTimeString('en-ZM',{day:'2-digit',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('en-ZM',{hour:'2-digit',minute:'2-digit'}); }
     function haversine(lat1,lng1,lat2,lng2) { const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLng=(lng2-lng1)*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
     function estimateTime(dist) { const min=Math.round((dist/30)*60); if(min<1) return '1 min'; if(min<60) return min+' min'; const h=Math.floor(min/60); const m=min%60; return h+'h '+m+'min'; }
-    function calculatePrice(dist) { let price = RATES[serviceType].base + dist * RATES[serviceType].perKm; return Math.round(price * 2) / 2; }
+    function calculatePrice(dist, vehicleType = 'Car', weight = 0, dims = '') {
+        let base = RATES[serviceType]?.base || 30;
+        let perKm = RATES[serviceType]?.perKm || 10;
+        // Vehicle adjustment
+        if (vehicleType === 'Bike') { base *= 0.7; perKm *= 0.8; }
+        else if (vehicleType === 'Truck') { base *= 1.5; perKm *= 1.3; }
+        let price = base + dist * perKm;
+        // Cargo weight adjustment
+        if (serviceType === 'delivery' || serviceType === 'cargo') {
+            const w = parseFloat(weight) || 0;
+            if (w > 50) price += 20;
+            else if (w > 20) price += 10;
+            // Dimensions: extra for bulky items
+            if (dims) {
+                const parts = dims.split('x').map(Number);
+                if (parts.length === 3) {
+                    const vol = parts[0] * parts[1] * parts[2];
+                    if (vol > 100000) price += 30;
+                    else if (vol > 50000) price += 15;
+                }
+            }
+        }
+        return Math.round(price * 2) / 2;
+    }
 
-    // ---------- AUTO PRICE (updates UI) ----------
-    function updatePriceDisplay() {
+    // ---------- AUTO PRICE ----------
+    function updatePriceDisplay(vehicleType = 'Car', weight = 0, dims = '') {
         if (!tempPickup || !tempDropoff) return;
         const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
-        const price = calculatePrice(dist);
+        const price = calculatePrice(dist, vehicleType, weight, dims);
         const pInput = document.getElementById('priceInput');
         if (pInput) pInput.value = price;
         const dSpan = document.getElementById('distanceDisplay');
@@ -231,7 +263,10 @@
         const aSpan = document.getElementById('autoPriceDisplay');
         if (aSpan) aSpan.innerText = `${CURRENCY}${price}`;
         const bSpan = document.getElementById('fareBreakdown');
-        if (bSpan) bSpan.innerText = `Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${price}`;
+        if (bSpan) {
+            const vehicleLabel = vehicleType || 'Car';
+            bSpan.innerText = `${vehicleLabel} • ${dist.toFixed(2)}km • ${CURRENCY}${price}`;
+        }
         return { dist, price };
     }
 
@@ -241,18 +276,26 @@
     onMessage(messaging,(p)=>showNotification(p.notification.title,p.notification.body));
     function haptic(){ if(navigator.vibrate) navigator.vibrate(10); }
 
-    // ---------- RATINGS ----------
+    // ---------- RATINGS (two-way) ----------
     async function rateDriver(reqId, driverId, rating, comment) {
-        await setDoc(doc(db,"ratings",reqId),{driverId,rating,comment,timestamp:serverTimestamp(),requestId:reqId});
-        const snap=await getDocs(query(collection(db,"ratings"),where("driverId","==",driverId)));
+        await setDoc(doc(db,"ratings",reqId),{driverId,rating,comment,timestamp:serverTimestamp(),requestId:reqId,type:'driver'});
+        const snap=await getDocs(query(collection(db,"ratings"),where("driverId","==",driverId),where("type","==","driver")));
         let total=0,count=0; snap.forEach(d=>{total+=d.data().rating; count++;});
         await updateDoc(doc(db,"drivers",driverId),{averageRating:total/count,ratingsCount:count});
         Swal.fire({title:'Thanks!',icon:'success',timer:1500,showConfirmButton:false});
     }
 
+    async function rateCustomer(reqId, customerId, rating, comment) {
+        await setDoc(doc(db,"ratings",reqId+'_customer'),{customerId,rating,comment,timestamp:serverTimestamp(),requestId:reqId,type:'customer'});
+        const snap=await getDocs(query(collection(db,"ratings"),where("customerId","==",customerId),where("type","==","customer")));
+        let total=0,count=0; snap.forEach(d=>{total+=d.data().rating; count++;});
+        await updateDoc(doc(db,"users",customerId),{customerRating:total/count,ratingsCount:count});
+        Swal.fire({title:'Customer rated!',icon:'success',timer:1500,showConfirmButton:false});
+    }
+
     // ---------- AUTH ----------
     async function saveUserToFirestore(user, role, name, extra={}) {
-        await setDoc(doc(db,"users", user.uid),{email:user.email, name, role,createdAt:serverTimestamp()});
+        await setDoc(doc(db,"users", user.uid),{email:user.email, name, role,createdAt:serverTimestamp(), customerRating:0, ratingsCount:0});
         if(role==='driver') {
             await setDoc(doc(db,"drivers",user.uid),{
                 currentLat:-15.3875,currentLng:28.3228,
@@ -274,7 +317,12 @@
             else await setDoc(doc(db,"drivers",uid),driverData);
         }
         const savedSnap=await getDoc(doc(db,"savedPlaces",uid));
-        savedPlaces=savedSnap.exists()?savedSnap.data().places||[]:[];
+        if(savedSnap.exists()) {
+            const data = savedSnap.data();
+            savedPlaces = data.places || [];
+            defaultHome = data.defaultHome || null;
+            defaultWork = data.defaultWork || null;
+        }
     }
 
     // ---------- LISTENERS ----------
@@ -436,10 +484,9 @@
     }
 
     // ============================================================
-    // =============== IMPROVED HEADER (role‑aware dropdown) =======
+    // =============== HEADER (role‑aware dropdown) ===============
     // ============================================================
     function renderHeader(title, logoutId) {
-        // Determine which tabs to show based on role
         let tabs = [];
         if (currentRole === 'customer') {
             tabs = [
@@ -456,7 +503,7 @@
                 { id: 'active', icon: 'fa-truck', label: 'Active' },
                 { id: 'history', icon: 'fa-history', label: 'History' },
             ];
-        } else { // admin
+        } else {
             tabs = [
                 { id: 'admin', icon: 'fa-chart-line', label: 'Dashboard' },
             ];
@@ -474,8 +521,9 @@
                     <div class="header-avatar">${currentUser?.email?.charAt(0).toUpperCase() || 'U'}</div>
                     <div>
                         <div class="font-bold text-lg">${currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}</div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="rating-badge"><i class="fas fa-star text-yellow-400"></i> ${driverData.averageRating?.toFixed(2) || '4.80'} (${driverData.ratingsCount || 1})</span>
+                            ${currentRole === 'customer' ? `<span class="rating-badge"><i class="fas fa-star text-green-400"></i> ${(currentUser?.customerRating || 0).toFixed(1)}</span>` : ''}
                             <button id="driverModeToggle" class="text-xs bg-gray-200 dark:bg-gray-700 px-3 py-0.5 rounded-full">${currentRole === 'driver' ? '🔴 Driver mode' : '👤 Passenger mode'}</button>
                         </div>
                     </div>
@@ -497,7 +545,7 @@
     }
 
     // ============================================================
-    // =============== IMPROVED PROFILE MODAL =====================
+    // =============== PROFILE MODAL (improved) ===================
     // ============================================================
     function showProfileModal() {
         const html = `
@@ -529,6 +577,15 @@
                     <hr class="my-2 border-gray-300">
                     <div class="text-center">
                         <button id="editProfileBtn" class="btn-primary text-sm px-4 py-1">✏️ Edit Profile</button>
+                    </div>
+                    <div class="mt-2">
+                        <p class="font-semibold text-sm">🏠 Default Places</p>
+                        <div class="flex gap-2 mt-1">
+                            <button id="setHomeBtn" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">Set Home</button>
+                            <button id="setWorkBtn" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full">Set Work</button>
+                            <button id="clearDefaultsBtn" class="text-xs bg-red-100 dark:bg-red-900 px-3 py-1 rounded-full">Clear</button>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-1">${defaultHome ? `🏠 Home: ${defaultHome.name}` : ''} ${defaultWork ? `🏢 Work: ${defaultWork.name}` : ''}</div>
                     </div>
                 ` : ''}
                 <div class="mt-2 text-xs text-gray-400 text-center">
@@ -590,6 +647,35 @@
                         }
                     });
                 }
+
+                // Default places
+                const setHomeBtn = container.querySelector('#setHomeBtn');
+                const setWorkBtn = container.querySelector('#setWorkBtn');
+                const clearDefaultsBtn = container.querySelector('#clearDefaultsBtn');
+
+                if (setHomeBtn) {
+                    setHomeBtn.addEventListener('click', async () => {
+                        if (!tempPickup) return Swal.fire('No location', 'Set a pickup location first on the map.', 'info');
+                        defaultHome = { name: tempPickupAddress || 'Home', lat: tempPickup.lat, lng: tempPickup.lng };
+                        await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces, defaultHome, defaultWork }, { merge: true });
+                        Swal.fire({ title: 'Home set!', icon: 'success', timer: 1000 });
+                    });
+                }
+                if (setWorkBtn) {
+                    setWorkBtn.addEventListener('click', async () => {
+                        if (!tempPickup) return Swal.fire('No location', 'Set a pickup location first on the map.', 'info');
+                        defaultWork = { name: tempPickupAddress || 'Work', lat: tempPickup.lat, lng: tempPickup.lng };
+                        await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces, defaultHome, defaultWork }, { merge: true });
+                        Swal.fire({ title: 'Work set!', icon: 'success', timer: 1000 });
+                    });
+                }
+                if (clearDefaultsBtn) {
+                    clearDefaultsBtn.addEventListener('click', async () => {
+                        defaultHome = null; defaultWork = null;
+                        await setDoc(doc(db, "savedPlaces", currentUser.uid), { places: savedPlaces, defaultHome, defaultWork }, { merge: true });
+                        Swal.fire({ title: 'Defaults cleared', icon: 'info', timer: 1000 });
+                    });
+                }
             }
         });
     }
@@ -603,7 +689,6 @@
                 ${renderHeader(``, 'logoutBtn')}
                 <div id="tabContent">Loading...</div>
             </div>`;
-        // Bind events
         document.getElementById('driverModeToggle').onclick = async () => {
             if (currentRole === 'driver') {
                 await updateDoc(doc(db, "users", currentUser.uid), { role: 'customer' });
@@ -620,15 +705,12 @@
             }
         };
 
-        // Unified dropdown handling
         const dropdownMenu = document.getElementById('dropdownMenu');
         const hamburgerBtn = document.getElementById('hamburgerBtn');
-
         hamburgerBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             dropdownMenu?.classList.toggle('open');
         });
-
         document.addEventListener('click', (e) => {
             if (dropdownMenu && hamburgerBtn && 
                 !dropdownMenu.contains(e.target) && 
@@ -636,7 +718,6 @@
                 dropdownMenu.classList.remove('open');
             }
         });
-
         dropdownMenu?.querySelectorAll('[data-tab]').forEach(item => {
             item.addEventListener('click', (e) => {
                 const tab = item.dataset.tab;
@@ -655,10 +736,8 @@
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
         const content=document.getElementById('tabContent');
-        // Only Rides, Food, Shops, Cargo, History remain
-        if (activeTab === 'rides') {
-            renderRidesTab(content);
-        } else {
+        if (activeTab === 'rides') renderRidesTab(content);
+        else {
             switch(activeTab) {
                 case 'food': renderCustomerFoodTab(content); break;
                 case 'shops': renderCustomerShopsTab(content); break;
@@ -670,7 +749,9 @@
         updateNewOrderBadge();
     }
 
-    // =============== RIDES TAB (Home) – integrated map ===============
+    // ============================================================
+    // =============== RIDES TAB (HOME) ===========================
+    // ============================================================
     function renderRidesTab(container) {
         serviceType = 'taxi';
         searchPerformed = false;
@@ -684,8 +765,16 @@
                     <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
                     <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
+                    <button id="defaultHomeBtn" class="text-xs bg-green-100 dark:bg-green-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🏠 Home</button>
+                    <button id="defaultWorkBtn" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🏢 Work</button>
                 </div>
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
+                <div class="flex gap-2">
+                    <select id="vehicleSelect" class="text-sm flex-1">
+                        ${VEHICLES.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                    <input type="datetime-local" id="scheduleTime" class="text-sm flex-1" placeholder="Schedule">
+                </div>
                 <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
                 <div id="customerMap" class="map-container"></div>
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
@@ -698,14 +787,99 @@
                     <select id="cargoSelect" class="text-sm"><option>1 passenger</option><option>2 passengers</option><option>3 passengers</option><option>4 passengers</option></select>
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
+                <div class="flex gap-2">
+                    <input type="text" id="promoInput" placeholder="Promo code" class="text-sm flex-1">
+                    <button id="applyPromoBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full">Apply</button>
+                </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
                 <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request Taxi</button>
             </div>`;
         container.innerHTML = html;
         attachMapEvents(container);
+        // Vehicle change updates price
+        document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
+            const vehicle = e.target.value;
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            updatePriceDisplay(vehicle, weight, dims);
+        });
+        // Schedule time: just store, not used in this version but UI ready
     }
 
-    // ---------- SHARED MAP EVENTS (used by Rides and Cargo) ----------
+    // ============================================================
+    // =============== CARGO TAB ===================================
+    // ============================================================
+    function renderCustomerCargoTab(container) {
+        serviceType = 'cargo';
+        const html = `
+            <h3 class="text-xl font-bold mb-3">📦 Cargo Request</h3>
+            <div class="space-y-3">
+                <div><label class="text-sm font-medium">Item description</label><input type="text" id="cargoDesc" placeholder="e.g. Furniture, Electronics..." class="mt-1"></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-sm font-medium">Weight (kg)</label><input type="number" id="cargoWeight" placeholder="e.g. 50" class="mt-1" value="0"></div>
+                    <div><label class="text-sm font-medium">Dimensions (LxWxH cm)</label><input type="text" id="cargoDims" placeholder="e.g. 100x50x60" class="mt-1"></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
+                    <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
+                    <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
+                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
+                </div>
+                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
+                <select id="vehicleSelect" class="text-sm">${VEHICLES.map(v => `<option value="${v}">${v}</option>`).join('')}</select>
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
+                <div id="customerMap" class="map-container"></div>
+                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
+                    <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
+                    <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
+                    <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
+                    <div id="fareBreakdown" class="text-xs"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="cargoSelect" class="text-sm"><option>Package</option><option>Box</option><option>Furniture</option></select>
+                    <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
+                </div>
+                <input type="text" id="promoInput" placeholder="Promo code" class="text-sm">
+                <button id="applyPromoBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full w-full">Apply Promo</button>
+                <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
+                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request Cargo</button>
+            </div>`;
+        container.innerHTML = html;
+        // Override map id for cargo
+        const cargoMap = document.getElementById('customerMap');
+        if (cargoMap) cargoMap.id = 'cargoMapInternal';
+        attachMapEvents(container);
+        // Restore id for internal use
+        const internalMap = document.getElementById('cargoMapInternal');
+        if (internalMap) internalMap.id = 'customerMap';
+
+        // Weight/dimensions update price
+        document.getElementById('cargoWeight')?.addEventListener('input', () => {
+            const vehicle = document.getElementById('vehicleSelect')?.value || 'Car';
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            updatePriceDisplay(vehicle, weight, dims);
+        });
+        document.getElementById('cargoDims')?.addEventListener('input', () => {
+            const vehicle = document.getElementById('vehicleSelect')?.value || 'Car';
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            updatePriceDisplay(vehicle, weight, dims);
+        });
+        document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
+            const vehicle = e.target.value;
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            updatePriceDisplay(vehicle, weight, dims);
+        });
+    }
+
+    // ============================================================
+    // =============== MAP EVENTS (shared) ========================
+    // ============================================================
     function attachMapEvents(container) {
         const pickupInput = document.getElementById('pickupInput');
         const dropoffInput = document.getElementById('dropoffInput');
@@ -714,18 +888,42 @@
         const searchBtn = document.getElementById('searchBtn');
         const publishBtn = document.getElementById('publishBtn');
 
+        // Apply promo
+        const applyPromoBtn = document.getElementById('applyPromoBtn');
+        if (applyPromoBtn) {
+            applyPromoBtn.addEventListener('click', () => {
+                const code = document.getElementById('promoInput')?.value?.toUpperCase()?.trim();
+                if (!code) return Swal.fire('Enter a code');
+                if (PROMO_CODES[code] !== undefined) {
+                    activePromo = { code, discount: PROMO_CODES[code] };
+                    Swal.fire({ title: `Promo applied! ${code} – ${PROMO_CODES[code]*100}% off`, icon: 'success', timer: 1500 });
+                    updatePriceDisplay();
+                } else {
+                    Swal.fire('Invalid code', 'Try SAVE10, SAVE20, or FREE', 'warning');
+                }
+            });
+        }
+
         function performSearch() {
             if (!tempPickup || !tempDropoff) {
                 Swal.fire('Missing locations', 'Please set both pickup and dropoff.', 'warning');
                 return;
             }
-            const result = updatePriceDisplay();
+            const vehicle = document.getElementById('vehicleSelect')?.value || 'Car';
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            const result = updatePriceDisplay(vehicle, weight, dims);
             if (result) {
                 searchPerformed = true;
                 publishBtn.disabled = false;
+                let promoText = '';
+                if (activePromo) {
+                    const discounted = result.price * (1 - activePromo.discount);
+                    promoText = `<br>💰 After promo: <strong>${CURRENCY}${discounted.toFixed(2)}</strong> (${activePromo.discount*100}% off)`;
+                }
                 Swal.fire({
                     title: 'Trip Approved!',
-                    html: `Distance: <strong>${result.dist.toFixed(2)} km</strong><br>ETA: <strong>${estimateTime(result.dist)}</strong><br>Price: <strong>${CURRENCY}${result.price}</strong>`,
+                    html: `Distance: <strong>${result.dist.toFixed(2)} km</strong><br>ETA: <strong>${estimateTime(result.dist)}</strong><br>Price: <strong>${CURRENCY}${result.price}</strong>${promoText}`,
                     icon: 'success',
                     timer: 3000,
                     showConfirmButton: true
@@ -805,6 +1003,26 @@
             } else Swal.fire('Error', 'Geolocation not supported', 'error');
         });
 
+        // Default Home/Work buttons
+        const homeBtn = document.getElementById('defaultHomeBtn');
+        if (homeBtn) {
+            homeBtn.addEventListener('click', () => {
+                if (defaultHome) {
+                    setLocationForMode('pickup', { lat: defaultHome.lat, lng: defaultHome.lng }, defaultHome.name);
+                    pickupInput.value = defaultHome.name;
+                } else Swal.fire('No home set', 'Set it in your profile first.', 'info');
+            });
+        }
+        const workBtn = document.getElementById('defaultWorkBtn');
+        if (workBtn) {
+            workBtn.addEventListener('click', () => {
+                if (defaultWork) {
+                    setLocationForMode('pickup', { lat: defaultWork.lat, lng: defaultWork.lng }, defaultWork.name);
+                    pickupInput.value = defaultWork.name;
+                } else Swal.fire('No work address set', 'Set it in your profile first.', 'info');
+            });
+        }
+
         document.getElementById('swapLocations').addEventListener('click', () => {
             const tempP = tempPickup, tempA = tempPickupAddress;
             tempPickup = tempDropoff; tempPickupAddress = tempDropoffAddress;
@@ -831,7 +1049,7 @@
             const { value: name } = await Swal.fire({ title: 'Save this place', input: 'text', inputLabel: 'Name', inputPlaceholder: 'Home, Work...', showCancelButton: true });
             if (!name) return;
             savedPlaces.push({ name, lat: loc.lat, lng: loc.lng, address: addr || 'Point' });
-            await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces});
+            await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces, defaultHome, defaultWork});
             renderSavedPlaces();
             Swal.fire({ title: 'Saved!', icon: 'success', timer: 1000 });
         });
@@ -846,10 +1064,15 @@
             if (!tempPickup || !tempDropoff) return Swal.fire('Error','Set both pickup and dropoff','warning');
             if (tempPickup.lat === tempDropoff.lat && tempPickup.lng === tempDropoff.lng) return Swal.fire('Same location');
             let price = parseFloat(document.getElementById('priceInput').value);
-            if (isNaN(price)) price = calculatePrice(haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng));
+            const vehicle = document.getElementById('vehicleSelect')?.value || 'Car';
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            if (isNaN(price)) price = calculatePrice(haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng), vehicle, weight, dims);
+            if (activePromo) price = price * (1 - activePromo.discount);
             if (price <= 0) return Swal.fire('Invalid price');
             const detail = document.getElementById('cargoSelect').value;
             const payment = document.getElementById('paymentSelect').value;
+            const scheduled = document.getElementById('scheduleTime')?.value || null;
             try {
                 const counterRef = doc(db,"counters","requests");
                 let tripNumber = 1;
@@ -863,19 +1086,24 @@
                     customerName: currentUser.email,
                     type: serviceType,
                     cargoDetail: detail,
-                    price,
+                    price: Math.round(price * 100) / 100,
                     paymentMethod: payment,
                     status: 'pending',
                     driverId: null,
                     driverName: null,
                     driverCar: '',
                     driverPlate: '',
+                    vehicleType: vehicle,
+                    weight: parseFloat(weight) || 0,
+                    dimensions: dims || '',
                     pickupLatLng: { lat: tempPickup.lat, lng: tempPickup.lng },
                     dropoffLatLng: { lat: tempDropoff.lat, lng: tempDropoff.lng },
                     pickupAddress: tempPickupAddress || 'Pickup',
                     dropoffAddress: tempDropoffAddress || 'Dropoff',
                     createdAt: serverTimestamp(),
-                    tripNumber: tripNumber
+                    tripNumber: tripNumber,
+                    scheduledFor: scheduled || null,
+                    promoCode: activePromo?.code || null
                 };
                 await addDoc(collection(db,"requests"), req);
                 Swal.fire({ title: 'Request sent!', icon: 'success', timer: 2000 });
@@ -889,6 +1117,8 @@
                 if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
                 if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
                 drawCustomerRoute();
+                activePromo = null;
+                document.getElementById('promoInput').value = '';
             } catch(e) {
                 Swal.fire('Error', e.message, 'error');
             }
@@ -904,10 +1134,15 @@
         pickupInput.value = tempPickupAddress || '';
         dropoffInput.value = tempDropoffAddress || '';
         updateLocationUI();
-        if (tempPickup && tempDropoff) updatePriceDisplay();
+        if (tempPickup && tempDropoff) {
+            const vehicle = document.getElementById('vehicleSelect')?.value || 'Car';
+            const weight = document.getElementById('cargoWeight')?.value || 0;
+            const dims = document.getElementById('cargoDims')?.value || '';
+            updatePriceDisplay(vehicle, weight, dims);
+        }
     }
 
-    // ---------- CORE LOCATION HELPERS ----------
+    // ---------- LOCATION HELPERS ----------
     function setLocationForMode(mode, latlng, address) {
         haptic();
         if (mode === 'pickup') {
@@ -1022,7 +1257,7 @@
             if (del) del.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 savedPlaces = savedPlaces.filter(p => p.name !== name);
-                await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces});
+                await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces, defaultHome, defaultWork});
                 renderSavedPlaces();
             });
         });
@@ -1037,15 +1272,52 @@
     function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
     // ============================================================
-    // =============== FULLY FUNCTIONAL FOOD TAB ==================
+    // =============== FOOD TAB WITH DRIVER TRACKING ==============
     // ============================================================
     function renderCustomerFoodTab(container) {
         if (foodOrdersUnsubscribe) {
             foodOrdersUnsubscribe();
             foodOrdersUnsubscribe = null;
         }
+        // Cleanup any existing tracking
+        Object.values(foodTrackingUnsubs).forEach(unsub => unsub());
+        Object.keys(foodTrackingUnsubs).forEach(key => delete foodTrackingUnsubs[key]);
 
         let foodOrders = [];
+
+        function renderDriverMapForOrder(orderId, driverId) {
+            const mapContainerId = `foodMap_${orderId}`;
+            const mapContainer = document.getElementById(mapContainerId);
+            if (!mapContainer) return;
+            if (window[`foodMap_${orderId}`]) {
+                window[`foodMap_${orderId}`].remove();
+                delete window[`foodMap_${orderId}`];
+            }
+            if (foodTrackingUnsubs[orderId]) {
+                foodTrackingUnsubs[orderId]();
+                delete foodTrackingUnsubs[orderId];
+            }
+
+            const map = L.map(mapContainerId).setView([-15.3875, 28.3228], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            window[`foodMap_${orderId}`] = map;
+
+            let driverMarker = L.marker([-15.3875, 28.3228], {
+                icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] })
+            }).addTo(map).bindTooltip('Driver');
+
+            const unsub = onSnapshot(doc(db, "drivers", driverId), (docSnap) => {
+                if (docSnap.exists()) {
+                    const loc = docSnap.data();
+                    const lat = loc.currentLat || -15.3875;
+                    const lng = loc.currentLng || 28.3228;
+                    driverMarker.setLatLng([lat, lng]);
+                    map.setView([lat, lng], 14);
+                    driverMarker.bindTooltip(`Driver en route`).openTooltip();
+                }
+            });
+            foodTrackingUnsubs[orderId] = unsub;
+        }
 
         function updateOrderHistory() {
             const historyContainer = document.getElementById('foodOrderHistory');
@@ -1061,6 +1333,9 @@
                     delivered: 'text-green-500 bg-green-50 dark:bg-green-900'
                 };
                 const statusLabel = o.status.charAt(0).toUpperCase() + o.status.slice(1);
+                const showMap = o.status === 'accepted' && o.driverId;
+                // Tracking link (shareable)
+                const trackingLink = o.id ? `${window.location.origin}/track?order=${o.id}` : '';
                 return `
                     <div class="border-b border-gray-100 dark:border-gray-700 py-3">
                         <div class="flex justify-between items-center">
@@ -1070,11 +1345,72 @@
                         <div class="text-xs mt-1">${o.items.map(i => `${i.name} × ${i.qty}`).join(', ')}</div>
                         <div class="text-xs text-gray-400">${CURRENCY}${o.total} • ${formatDate(o.createdAt)}</div>
                         ${o.driverName ? `<div class="text-xs text-gray-400">🚚 Driver: ${o.driverName}</div>` : ''}
+                        ${showMap ? `<div id="foodMap_${o.id}" class="map-container mt-2" style="height:150px;"></div>` : ''}
+                        ${trackingLink ? `<div class="mt-1"><span class="tracking-link" onclick="navigator.clipboard.writeText('${trackingLink}').then(()=>Swal.fire({title:'Link copied!',icon:'success',timer:800}))">🔗 Share tracking link</span></div>` : ''}
+                        ${o.status === 'delivered' ? `
+                            <div class="mt-1 flex gap-2">
+                                <button class="rate-driver text-xs bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded" data-req="${o.id}" data-driver="${o.driverId || ''}">⭐ Rate Driver</button>
+                                <button class="rate-customer text-xs bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded" data-req="${o.id}" data-customer="${o.customerId}">⭐ Rate Customer</button>
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             }).join('');
+
+            // Rating buttons
+            document.querySelectorAll('.rate-driver').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const reqId = btn.dataset.req;
+                    const driverId = btn.dataset.driver;
+                    if (!driverId) return Swal.fire('No driver assigned');
+                    const { value: rating } = await Swal.fire({
+                        title: 'Rate Driver',
+                        input: 'range',
+                        inputLabel: 'Rating (1-5)',
+                        inputAttributes: { min: 1, max: 5, step: 1, value: 5 },
+                        showCancelButton: true
+                    });
+                    if (rating) {
+                        const { value: comment } = await Swal.fire({
+                            title: 'Comment (optional)',
+                            input: 'text',
+                            showCancelButton: true
+                        });
+                        await rateDriver(reqId, driverId, parseInt(rating), comment || '');
+                    }
+                });
+            });
+            document.querySelectorAll('.rate-customer').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const reqId = btn.dataset.req;
+                    const customerId = btn.dataset.customer;
+                    if (!customerId) return Swal.fire('No customer');
+                    const { value: rating } = await Swal.fire({
+                        title: 'Rate Customer',
+                        input: 'range',
+                        inputLabel: 'Rating (1-5)',
+                        inputAttributes: { min: 1, max: 5, step: 1, value: 5 },
+                        showCancelButton: true
+                    });
+                    if (rating) {
+                        const { value: comment } = await Swal.fire({
+                            title: 'Comment (optional)',
+                            input: 'text',
+                            showCancelButton: true
+                        });
+                        await rateCustomer(reqId, customerId, parseInt(rating), comment || '');
+                    }
+                });
+            });
+
+            foodOrders.forEach(o => {
+                if (o.status === 'accepted' && o.driverId) {
+                    setTimeout(() => renderDriverMapForOrder(o.id, o.driverId), 100);
+                }
+            });
         }
 
+        // ---- Restaurants ----
         const loadRestaurants = async () => {
             const snap = await getDocs(collection(db, "restaurants"));
             if (!snap.empty) {
@@ -1118,6 +1454,10 @@
                         <span id="cartCount">0 items</span>
                     </div>
                     <div id="cartItems" class="mt-2"></div>
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="foodPromoInput" placeholder="Promo code" class="text-sm flex-1">
+                        <button id="foodApplyPromo" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full">Apply</button>
+                    </div>
                     <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">Checkout (${CURRENCY}0.00)</button>
                 </div>
                 <div class="mt-4 border-t pt-3">
@@ -1126,6 +1466,19 @@
                 </div>
             `;
 
+            // Food promo
+            let foodPromo = null;
+            document.getElementById('foodApplyPromo')?.addEventListener('click', () => {
+                const code = document.getElementById('foodPromoInput')?.value?.toUpperCase()?.trim();
+                if (!code) return Swal.fire('Enter a code');
+                if (PROMO_CODES[code] !== undefined) {
+                    foodPromo = { code, discount: PROMO_CODES[code] };
+                    Swal.fire({ title: `Promo applied! ${code} – ${PROMO_CODES[code]*100}% off`, icon: 'success', timer: 1500 });
+                    updateCartUI();
+                } else Swal.fire('Invalid code', 'Try SAVE10, SAVE20, or FREE', 'warning');
+            });
+
+            // View Menu
             document.querySelectorAll('.view-menu-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const card = e.target.closest('.restaurant-card');
@@ -1222,8 +1575,9 @@
                 }
 
                 if (checkoutBtn) {
-                    const total = foodCart.reduce((s, i) => s + i.price * i.qty, 0);
-                    checkoutBtn.innerText = `Checkout (${CURRENCY}${total.toFixed(2)})`;
+                    let total = foodCart.reduce((s, i) => s + i.price * i.qty, 0);
+                    if (foodPromo) total = total * (1 - foodPromo.discount);
+                    checkoutBtn.innerText = `Checkout (${CURRENCY}${total.toFixed(2)})${foodPromo ? ' ✨' : ''}`;
                 }
             };
 
@@ -1243,7 +1597,8 @@
                     deliveryAddr = addr;
                 }
 
-                const total = foodCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                let total = foodCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                if (foodPromo) total = total * (1 - foodPromo.discount);
 
                 try {
                     Swal.fire({ title: 'Placing order...', timer: 1500, didOpen: () => Swal.showLoading() });
@@ -1252,16 +1607,19 @@
                         customerId: currentUser.uid,
                         customerName: currentUser.email,
                         items: foodCart.map(i => ({ name: i.name, price: i.price, qty: i.qty })),
-                        total,
+                        total: Math.round(total * 100) / 100,
                         deliveryAddress: deliveryAddr,
                         status: 'pending',
                         driverId: null,
                         driverName: null,
-                        createdAt: serverTimestamp()
+                        createdAt: serverTimestamp(),
+                        promoCode: foodPromo?.code || null
                     };
                     await addDoc(collection(db, "foodOrders"), order);
 
                     foodCart = [];
+                    foodPromo = null;
+                    document.getElementById('foodPromoInput').value = '';
                     updateCartUI();
 
                     Swal.fire({ title: 'Order placed!', icon: 'success', timer: 2000, showConfirmButton: false });
@@ -1271,6 +1629,7 @@
                 }
             });
 
+            // Real‑time listener
             const q = query(
                 collection(db, "foodOrders"),
                 where("customerId", "==", currentUser.uid),
@@ -1287,7 +1646,9 @@
         loadRestaurants();
     }
 
-    // ---------- SHOPS TAB ----------
+    // ============================================================
+    // =============== SHOPS TAB ===================================
+    // ============================================================
     function renderCustomerShopsTab(container) {
         const loadShops = async () => {
             const snap = await getDocs(collection(db, "restaurants"));
@@ -1317,55 +1678,9 @@
         loadShops();
     }
 
-    // ---------- CARGO TAB ----------
-    function renderCustomerCargoTab(container) {
-        serviceType = 'delivery'; // override to delivery for cargo
-        const html = `
-            <h3 class="text-xl font-bold mb-3">📦 Cargo Request</h3>
-            <div class="space-y-3">
-                <div><label class="text-sm font-medium">Item description</label><input type="text" id="cargoDesc" placeholder="e.g. Furniture, Electronics..." class="mt-1"></div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="text-sm font-medium">Weight (kg)</label><input type="number" id="cargoWeight" placeholder="e.g. 50" class="mt-1"></div>
-                    <div><label class="text-sm font-medium">Dimensions (LxWxH cm)</label><input type="text" id="cargoDims" placeholder="e.g. 100x50x60" class="mt-1"></div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
-                    <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
-                    <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
-                    <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
-                </div>
-                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
-                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
-                <div id="cargoMap" class="map-container"></div>
-                <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
-                    <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
-                    <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
-                    <div class="flex justify-between"><span>💰 Price</span><span id="autoPriceDisplay">—</span></div>
-                    <div id="fareBreakdown" class="text-xs"></div>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <select id="cargoSelect" class="text-sm"><option>Package</option><option>Box</option><option>Furniture</option></select>
-                    <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
-                </div>
-                <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request Cargo</button>
-            </div>`;
-        container.innerHTML = html;
-        // Reuse the same map events but with a different map id
-        const origMap = document.getElementById('customerMap');
-        if (origMap) origMap.id = 'cargoMap'; // ensure we use the cargo map container
-        // But the attachMapEvents expects 'customerMap' id, so we need to adjust.
-        // We'll temporarily rename the id to 'customerMap' for the events to work.
-        const cargoMapEl = document.getElementById('cargoMap');
-        if (cargoMapEl) cargoMapEl.id = 'customerMap';
-        attachMapEvents(container);
-        // Restore id after attach? Not necessary as we only use once.
-    }
-
-    // ---------- HISTORY TAB ----------
+    // ============================================================
+    // =============== HISTORY TAB =================================
+    // ============================================================
     function renderCustomerHistoryTab(container) {
         const rideHistory = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
         const getFoodOrders = async () => {
@@ -1379,12 +1694,12 @@
                     html += `<h4 class="font-semibold mt-2">🚗 Rides & Deliveries</h4>`;
                     html += rideHistory.map(r => {
                         const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
-                        return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center"><div><span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}<br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span></div><button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button></div>`;
+                        return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center"><div><span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}<br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>${r.vehicleType ? ` • ${r.vehicleType}` : ''}${r.promoCode ? ` ✨${r.promoCode}` : ''}</div><button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">View route</button></div>`;
                     }).join('');
                 }
                 if (foodOrders.length) {
                     html += `<h4 class="font-semibold mt-2">🍔 Food Orders</h4>`;
-                    html += foodOrders.map(o => `<div class="border-b border-gray-100 dark:border-gray-700 py-2"><span class="font-medium">Order #${o.id.substring(0,6)}</span> – ${CURRENCY}${o.total}<br><span class="text-xs text-gray-400">📅 ${formatDate(o.createdAt)}</span></div>`).join('');
+                    html += foodOrders.map(o => `<div class="border-b border-gray-100 dark:border-gray-700 py-2"><span class="font-medium">Order #${o.id.substring(0,6)}</span> – ${CURRENCY}${o.total}<br><span class="text-xs text-gray-400">📅 ${formatDate(o.createdAt)}</span>${o.promoCode ? ` ✨${o.promoCode}` : ''}</div>`).join('');
                 }
             }
             container.innerHTML = html;
@@ -1400,7 +1715,9 @@
         getFoodOrders();
     }
 
-    // ========== DRIVER DASHBOARD (unchanged) ==========
+    // ============================================================
+    // =============== DRIVER DASHBOARD ===========================
+    // ============================================================
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         const total = completed.reduce((s,r) => s + r.price, 0);
@@ -1580,6 +1897,9 @@
                 <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
                 <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
                 <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
+                <div><span class="text-gray-500">Vehicle:</span> ${trip.vehicleType || 'Car'}</div>
+                ${trip.weight ? `<div><span class="text-gray-500">Weight:</span> ${trip.weight} kg</div>` : ''}
+                ${trip.promoCode ? `<div><span class="text-gray-500">Promo:</span> ${trip.promoCode}</div>` : ''}
                 <div><span class="text-gray-500">Distance to dropoff:</span> ${distToDropoff.toFixed(2)} km (${estimateTime(distToDropoff)})</div>
                 <div class="flex flex-wrap gap-2">
                     <button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📍 Move to pickup</button>
@@ -1602,7 +1922,7 @@
         container.innerHTML = my.map(r => {
             const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
             return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
-                <div><span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span><br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span></div>
+                <div><span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span><br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>${r.vehicleType ? ` • ${r.vehicleType}` : ''}</div>
                 <span class="text-sm text-gray-400">${r.customerName}</span>
             </div>`;
         }).join('');
@@ -1642,6 +1962,11 @@
                 const badge = document.getElementById('chatBadge');
                 if (badge) badge.classList.add('hidden');
             }
+            // Notify if new message from other party (push notification)
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg && lastMsg.senderId !== userId && showBadge) {
+                showNotification('New message', `${lastMsg.senderName}: ${lastMsg.text}`);
+            }
         });
         const details = document.getElementById('chatDetails');
         if (details) {
@@ -1670,38 +1995,101 @@
         }
     }
 
-    // ---------- ADMIN PANEL ----------
+    // ============================================================
+    // =============== ADMIN PANEL (enhanced) =====================
+    // ============================================================
     async function renderAdminPanel() {
         const usersSnap=await getDocs(collection(db,"users"));
         const driversSnap=await getDocs(collection(db,"drivers"));
         const requestsSnap=await getDocs(collection(db,"requests"));
         const foodOrdersSnap=await getDocs(collection(db,"foodOrders"));
-        const byDay={}; allRequests.forEach(r=>{const d=r.createdAt?.toDate?.()?.toDateString()||'Unknown'; byDay[d]=(byDay[d]||0)+1;});
-        const topDrivers=[]; for(const d of driversSnap.docs){const user=await getDoc(doc(db,"users",d.id)); const email=user.exists()?user.data().email:d.id; const data=d.data(); topDrivers.push({email,rating:data.averageRating||0,count:data.ratingsCount||0,car:data.carModel||'',plate:data.plate||''});} topDrivers.sort((a,b)=>b.rating-a.rating);
+        
+        // Revenue chart data
+        const byDay={}; 
+        let totalRevenue = 0;
+        allRequests.forEach(r=>{
+            if (r.status === 'delivered') {
+                const d=r.createdAt?.toDate?.()?.toDateString()||'Unknown'; 
+                byDay[d]=(byDay[d]||0)+r.price;
+                totalRevenue += r.price;
+            }
+        });
+        const topDrivers=[]; 
+        for(const d of driversSnap.docs){
+            const user=await getDoc(doc(db,"users",d.id)); 
+            const email=user.exists()?user.data().email:d.id; 
+            const data=d.data(); 
+            const driverReqs = allRequests.filter(r => r.driverId === d.id && r.status === 'delivered');
+            const earnings = driverReqs.reduce((s,r) => s + r.price, 0);
+            topDrivers.push({email, rating:data.averageRating||0, count:data.ratingsCount||0, car:data.carModel||'', plate:data.plate||'', earnings });
+        } 
+        topDrivers.sort((a,b)=>b.earnings-a.earnings);
+
         document.getElementById('appContainer').innerHTML=`
             <div class="fade-in">
                 ${renderHeader('👑 Admin', 'adminLogout')}
-                <div class="grid grid-cols-4 gap-4 mb-4"><div class="card text-center p-3">👥 Users<br><span class="text-2xl font-bold">${usersSnap.size}</span></div><div class="card text-center p-3">🚚 Drivers<br><span class="text-2xl font-bold">${driversSnap.size}</span></div><div class="card text-center p-3">📦 Rides<br><span class="text-2xl font-bold">${requestsSnap.size}</span></div><div class="card text-center p-3">🍔 Food<br><span class="text-2xl font-bold">${foodOrdersSnap.size}</span></div></div>
-                <div class="card p-4 mb-4"><h3 class="font-semibold">📈 Requests per day</h3><canvas id="requestsChart" height="150"></canvas></div>
-                <div class="card p-4 mb-4"><h3 class="font-semibold">🏆 Top Drivers</h3><ul>${topDrivers.slice(0,5).map(d=>`<li>${d.email} – ⭐ ${d.rating.toFixed(1)} (${d.count}) – ${d.car} (${d.plate})</li>`).join('')}</ul></div>
-                <div class="card p-4 mb-4"><h3 class="font-semibold">📋 Requests</h3><button id="exportCSV" class="btn-primary text-sm px-3 py-1 mb-2">Export CSV</button><div id="adminRequestsList" class="max-h-48 overflow-auto"></div></div>
-                <div class="card p-4"><h3 class="font-semibold">👤 User Management (demo)</h3><div id="userManagementList"></div></div>
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="card text-center p-3">👥 Users<br><span class="text-2xl font-bold">${usersSnap.size}</span></div>
+                    <div class="card text-center p-3">🚚 Drivers<br><span class="text-2xl font-bold">${driversSnap.size}</span></div>
+                    <div class="card text-center p-3">📦 Rides<br><span class="text-2xl font-bold">${requestsSnap.size}</span></div>
+                    <div class="card text-center p-3">💰 Revenue<br><span class="text-2xl font-bold">${CURRENCY}${totalRevenue.toFixed(2)}</span></div>
+                </div>
+                <div class="card p-4 mb-4"><h3 class="font-semibold">📈 Revenue per day</h3><canvas id="revenueChart" height="150"></canvas></div>
+                <div class="card p-4 mb-4"><h3 class="font-semibold">🏆 Top Drivers (by earnings)</h3><ul>${topDrivers.slice(0,5).map(d=>`<li>${d.email} – ${CURRENCY}${d.earnings.toFixed(2)} ⭐ ${d.rating.toFixed(1)} (${d.count}) – ${d.car} (${d.plate})</li>`).join('')}</ul></div>
+                <div class="card p-4 mb-4">
+                    <h3 class="font-semibold">📋 Requests</h3>
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="all">All</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="pending">Pending</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="accepted">Accepted</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="delivered">Delivered</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="taxi">🚖 Taxi</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="delivery">📦 Delivery</button>
+                    </div>
+                    <div id="adminRequestsList" class="max-h-64 overflow-auto"></div>
+                </div>
+                <div class="card p-4"><h3 class="font-semibold">👤 User Management</h3><div id="userManagementList"></div></div>
             </div>`;
         document.getElementById('adminLogout').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderAdminPanel();};
-        new Chart(document.getElementById('requestsChart'),{type:'line',data:{labels:Object.keys(byDay),datasets:[{label:'Requests',data:Object.values(byDay),borderColor:'var(--primary)'}]}});
-        document.getElementById('adminRequestsList').innerHTML=allRequests.map(r=>{const td=r.tripNumber?`#${r.tripNumber}`:`#${r.id.substring(0,6)}`; return `<div class="border-b py-1 text-sm">${td} ${r.type} – ${r.status} – ${CURRENCY}${r.price}</div>`;}).join('');
-        document.getElementById('exportCSV').onclick=()=>{
-            const headers=['Trip Number','ID','Type','Status','Price','Customer','Driver','Car','Plate','Payment','Created','Pickup Address','Dropoff Address'];
-            const rows=allRequests.map(r=>[r.tripNumber||'',r.id,r.type,r.status,r.price,r.customerName,r.driverName||'',r.driverCar||'',r.driverPlate||'',r.paymentMethod,r.createdAt?.toDate?.()?.toISOString()||'',r.pickupAddress||'',r.dropoffAddress||'']);
-            const csv=[headers,...rows].map(row=>row.map(c=>`"${c}"`).join(',')).join('\n');
-            const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='logimove_requests.csv'; a.click(); Swal.fire('Exported!');
-        };
+        
+        new Chart(document.getElementById('revenueChart'),{type:'line',data:{labels:Object.keys(byDay),datasets:[{label:'Revenue (ZMW)',data:Object.values(byDay),borderColor:'var(--primary)',fill:false}]}});
+
+        // Filter functionality
+        let currentFilter = 'all';
+        function renderFilteredRequests() {
+            const filtered = currentFilter === 'all' ? allRequests : allRequests.filter(r => {
+                if (currentFilter === 'taxi' || currentFilter === 'delivery') return r.type === currentFilter;
+                return r.status === currentFilter;
+            });
+            document.getElementById('adminRequestsList').innerHTML = filtered.map(r => {
+                const td = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+                return `<div class="border-b py-1 text-sm flex justify-between items-center">
+                    <span>${td} ${r.type} – ${r.status} – ${CURRENCY}${r.price}${r.promoCode ? ` ✨${r.promoCode}` : ''}</span>
+                    <span class="text-xs text-gray-400">${r.customerName}</span>
+                </div>`;
+            }).join('');
+        }
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentFilter = btn.dataset.filter;
+                renderFilteredRequests();
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('bg-primary-light'));
+                btn.classList.add('bg-primary-light');
+            });
+        });
+        renderFilteredRequests();
+
+        // User management
         const userMgmt=document.getElementById('userManagementList');
         const allUsers=await getDocs(collection(db,"users"));
         userMgmt.innerHTML='';
-        for(const u of allUsers.docs){const data=u.data(); userMgmt.innerHTML+=`<div class="border-b py-1 flex justify-between"><span>${data.email} (${data.role})</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset</button></div></div>`;}
+        for(const u of allUsers.docs){const data=u.data(); 
+            const isDriver = data.role === 'driver';
+            const driverEarnings = isDriver ? allRequests.filter(r => r.driverId === u.id && r.status === 'delivered').reduce((s,r) => s + r.price, 0) : 0;
+            userMgmt.innerHTML+=`<div class="border-b py-1 flex justify-between items-center flex-wrap"><span>${data.email} (${data.role})${isDriver ? ` 💰${CURRENCY}${driverEarnings.toFixed(2)}` : ''}</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">Suspend</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">Reset</button></div></div>`;
+        }
         document.querySelectorAll('.suspendBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Suspend action (simulated)','info')));
         document.querySelectorAll('.resetBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo','Reset password email (simulated)','info')));
     }
