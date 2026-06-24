@@ -50,13 +50,45 @@
         input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
         .header-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1.1rem; }
         .rating-badge { background: rgba(251,191,36,0.15); color: #fbbf24; padding: 0.1rem 0.6rem; border-radius: 2rem; font-size: 0.7rem; font-weight: 600; }
-        .loc-card { background: var(--bg); border: 2px solid var(--border); border-radius: 1rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; transition: border 0.2s; }
+
+        /* ===== SMALLER SEARCH BOXES ===== */
+        .loc-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: border 0.2s;
+        }
         .loc-card.active-pickup { border-color: #10b981; }
         .loc-card.active-dropoff { border-color: #3b82f6; }
-        .loc-card .icon { font-size: 1.2rem; flex-shrink: 0; }
-        .loc-card input { border: none; background: transparent; padding: 0.2rem 0; flex: 1; color: var(--text); outline: none; }
-        .loc-card input::placeholder { color: var(--text-secondary); }
-        .loc-card .clear-btn { cursor: pointer; color: #ef4444; font-size: 0.8rem; flex-shrink: 0; }
+        .loc-card .icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .loc-card input {
+            border: none;
+            background: transparent;
+            padding: 0.15rem 0.2rem;
+            flex: 1;
+            color: var(--text);
+            outline: none;
+            font-size: 0.75rem;
+        }
+        .loc-card input::placeholder {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+        }
+        .loc-card .clear-btn {
+            cursor: pointer;
+            color: #ef4444;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            padding: 0 0.2rem;
+        }
+
         .autocomplete-dropdown { position: absolute; background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; max-height: 220px; overflow-y: auto; z-index: 30; width: 100%; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .autocomplete-item { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .autocomplete-item:hover { background: var(--primary-bg); }
@@ -162,7 +194,8 @@
     let mapSelectMode = "pickup";
     let fcmToken = null;
     let chatUnsub = null;
-    let activeTab = 'map';
+    // ===== PRIORITIZE RIDE PAGE AS HOME =====
+    let activeTab = 'rides'; // Changed from 'map'
     let seenRequestIds = new Set();
     let newOrderCount = 0;
     let driverPosUnsub = null;
@@ -411,11 +444,11 @@
         let tabs = [];
         if (currentRole === 'customer') {
             tabs = [
-                { id: 'map', icon: 'fa-map-marker-alt', label: 'Home' },
+                { id: 'rides', icon: 'fa-taxi', label: 'Rides' },
+                { id: 'map', icon: 'fa-map-marker-alt', label: 'Map' },
                 { id: 'food', icon: 'fa-utensils', label: 'Food' },
                 { id: 'shops', icon: 'fa-store', label: 'Shops' },
                 { id: 'cargo', icon: 'fa-box', label: 'Cargo' },
-                { id: 'rides', icon: 'fa-taxi', label: 'Rides' },
                 { id: 'navigation', icon: 'fa-directions', label: 'Navigation' },
                 { id: 'history', icon: 'fa-history', label: 'History' },
             ];
@@ -625,7 +658,10 @@
         document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800,showConfirmButton:false});};
         document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderCustomerTabs();};
         const content=document.getElementById('tabContent');
-        if (activeTab === 'map' || activeTab === undefined || !activeTab) {
+        // ===== RIDE PAGE PRIORITIZED AS HOME =====
+        if (activeTab === 'rides') {
+            renderSimplifiedRidesTab(content);
+        } else if (activeTab === 'map') {
             renderSimplifiedMapTab(content);
         } else {
             switch(activeTab) {
@@ -633,9 +669,8 @@
                 case 'shops': renderCustomerShopsTab(content); break;
                 case 'cargo': renderCustomerCargoTab(content); break;
                 case 'navigation': renderCustomerNavigationTab(content); break;
-                case 'rides': renderSimplifiedRidesTab(content); break;
                 case 'history': renderCustomerHistoryTab(content); break;
-                default: renderSimplifiedMapTab(content);
+                default: renderSimplifiedRidesTab(content);
             }
         }
         updateNewOrderBadge();
@@ -651,13 +686,13 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div class="loc-card active-pickup" id="pickupCard">
                         <span class="icon">📍</span>
-                        <input type="text" id="pickupInput" placeholder="Pickup" class="flex-1 text-sm" autocomplete="off">
+                        <input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off">
                         <span class="clear-btn" id="clearPickupInput">✕</span>
                         <div id="pickupDropdown" class="autocomplete-dropdown"></div>
                     </div>
                     <div class="loc-card" id="dropoffCard">
                         <span class="icon">🏁</span>
-                        <input type="text" id="dropoffInput" placeholder="Dropoff" class="flex-1 text-sm" autocomplete="off">
+                        <input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off">
                         <span class="clear-btn" id="clearDropoffInput">✕</span>
                         <div id="dropoffDropdown" class="autocomplete-dropdown"></div>
                     </div>
@@ -674,7 +709,7 @@
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
 
                 <!-- Search button (new) -->
-                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700">🔍 Search</button>
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
 
                 <!-- Map -->
                 <div id="customerMap" class="map-container"></div>
@@ -693,7 +728,7 @@
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full" disabled>Request</button>
+                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request</button>
             </div>`;
         container.innerHTML = html;
         attachMapEvents(container);
@@ -706,8 +741,8 @@
         const html = `
             <div class="space-y-3">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
-                    <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
+                    <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
+                    <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button id="useMyLocation" class="text-xs bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">📍 My location</button>
@@ -715,7 +750,7 @@
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
-                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700">🔍 Search</button>
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-sm">🔍 Search</button>
                 <div id="customerMap" class="map-container"></div>
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
@@ -728,7 +763,7 @@
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full" disabled>Request Taxi</button>
+                <button id="publishBtn" class="btn-primary w-full text-sm" disabled>Request Taxi</button>
             </div>`;
         container.innerHTML = html;
         attachMapEvents(container);
