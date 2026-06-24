@@ -70,7 +70,7 @@
         .new-order-badge { background: #ef4444; color: white; border-radius: 50%; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: bold; margin-left: 4px; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-        /* ===== IMPROVED DROPDOWN STYLES ===== */
+        /* ---- Improved dropdown styles ---- */
         .dropdown-menu {
             transition: opacity 0.2s ease, transform 0.2s ease;
             opacity: 0;
@@ -86,7 +86,7 @@
             padding: 0.5rem 0;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             z-index: 50;
-            display: block; /* always block but hidden via opacity/pointer-events */
+            display: block;
         }
         .dropdown-menu.open {
             opacity: 1;
@@ -169,7 +169,10 @@
     let driverMarkerCust = null;
     let customerRouteLine = null;
     let routingControl = null;
-    let searchPerformed = false;   // flag to enable Request button
+    let searchPerformed = false;
+
+    // Food listener cleanup
+    let foodOrdersUnsubscribe = null;
 
     const RATES = { taxi: { base: 20, perKm: 5 }, delivery: { base: 30, perKm: 10 } };
     const CURRENCY = "K";
@@ -510,15 +513,12 @@
             html: html,
             confirmButtonText: 'Close',
             didOpen: (modal) => {
-                // ---- FIX: Use the modal's own container ----
                 const container = modal.querySelector('.swal2-html-container') || modal;
 
-                // ---- Theme dots ----
                 container.querySelectorAll('.theme-dot').forEach(dot => {
                     dot.addEventListener('click', () => {
                         const themeName = dot.dataset.theme;
                         applyTheme(themeName);
-                        // Update active states inside the modal
                         container.querySelectorAll('.theme-dot').forEach(d => {
                             d.classList.toggle('active', d.dataset.theme === themeName);
                             d.style.borderColor = d.dataset.theme === themeName ? 'var(--text)' : 'transparent';
@@ -526,7 +526,6 @@
                     });
                 });
 
-                // ---- Dark toggle (corrected text) ----
                 const darkToggle = container.querySelector('#profileDarkToggle');
                 if (darkToggle) {
                     darkToggle.addEventListener('click', () => {
@@ -536,7 +535,6 @@
                     });
                 }
 
-                // ---- Edit profile (optional) ----
                 const editBtn = container.querySelector('#editProfileBtn');
                 if (editBtn) {
                     editBtn.addEventListener('click', async () => {
@@ -550,13 +548,12 @@
                         if (newName && newName.trim()) {
                             try {
                                 await updateDoc(doc(db, "users", currentUser.uid), { name: newName.trim() });
-                                // Update displayName in auth as well
                                 await updateProfile(auth.currentUser, { displayName: newName.trim() });
                                 currentUser.displayName = newName.trim();
                                 const nameSpan = container.querySelector('#profileUserName');
                                 if (nameSpan) nameSpan.textContent = newName.trim();
                                 Swal.fire({ title: 'Updated!', icon: 'success', timer: 1000 });
-                                renderCustomerTabs(); // re-render header
+                                renderCustomerTabs();
                             } catch (e) {
                                 Swal.fire('Error', e.message, 'error');
                             }
@@ -593,7 +590,7 @@
             }
         };
 
-        // ---- IMPROVED: Unified dropdown handling ----
+        // Unified dropdown handling
         const dropdownMenu = document.getElementById('dropdownMenu');
         const hamburgerBtn = document.getElementById('hamburgerBtn');
 
@@ -746,7 +743,6 @@
         const searchBtn = document.getElementById('searchBtn');
         const publishBtn = document.getElementById('publishBtn');
 
-        // ---- Search function ----
         function performSearch() {
             if (!tempPickup || !tempDropoff) {
                 Swal.fire('Missing locations', 'Please set both pickup and dropoff.', 'warning');
@@ -766,7 +762,6 @@
             }
         }
 
-        // ---- Autocomplete functions ----
         async function performSearchInput(input, dropdown, mode) {
             const query = input.value.trim();
             if (query.length < 2) { dropdown.style.display = 'none'; return; }
@@ -1070,12 +1065,46 @@
 
     function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
-    // ---------- FOOD, SHOPS, CARGO, NAVIGATION, HISTORY (unchanged) ----------
-    // (All these functions remain exactly as you had them – omitted for brevity in this diff,
-    //  but they are identical to your original.)
-    // For completeness, I include them below.
-    // ---------- FOOD TAB ----------
+    // ============================================================
+    // =============== FULLY FUNCTIONAL FOOD TAB ==================
+    // ============================================================
     function renderCustomerFoodTab(container) {
+        // If a previous listener exists, detach it
+        if (foodOrdersUnsubscribe) {
+            foodOrdersUnsubscribe();
+            foodOrdersUnsubscribe = null;
+        }
+
+        let foodOrders = [];
+
+        function updateOrderHistory() {
+            const historyContainer = document.getElementById('foodOrderHistory');
+            if (!historyContainer) return;
+            if (foodOrders.length === 0) {
+                historyContainer.innerHTML = '<div class="text-sm opacity-60">No orders yet</div>';
+                return;
+            }
+            historyContainer.innerHTML = foodOrders.map(o => {
+                const statusColors = {
+                    pending: 'text-amber-400 bg-amber-50 dark:bg-amber-900',
+                    accepted: 'text-blue-400 bg-blue-50 dark:bg-blue-900',
+                    delivered: 'text-green-500 bg-green-50 dark:bg-green-900'
+                };
+                const statusLabel = o.status.charAt(0).toUpperCase() + o.status.slice(1);
+                return `
+                    <div class="border-b border-gray-100 dark:border-gray-700 py-3">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">Order #${o.id.substring(0,6)}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${statusColors[o.status] || 'bg-gray-100'}">${statusLabel}</span>
+                        </div>
+                        <div class="text-xs mt-1">${o.items.map(i => `${i.name} × ${i.qty}`).join(', ')}</div>
+                        <div class="text-xs text-gray-400">${CURRENCY}${o.total} • ${formatDate(o.createdAt)}</div>
+                        ${o.driverName ? `<div class="text-xs text-gray-400">🚚 Driver: ${o.driverName}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
         const loadRestaurants = async () => {
             const snap = await getDocs(collection(db, "restaurants"));
             if (!snap.empty) {
@@ -1102,45 +1131,89 @@
                 <div id="foodContent" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     ${allRestaurants.map(r => `
                         <div class="restaurant-card" data-id="${r.id || r.name}">
-                            <div class="flex items-center gap-2"><span class="text-2xl">${r.logo || '🍽️'}</span><div><div class="font-bold">${r.name}</div><div class="text-xs opacity-60">${r.cuisine || ''} • ${r.location || ''}</div></div></div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-3xl">${r.logo || '🍽️'}</span>
+                                <div>
+                                    <div class="font-bold">${r.name}</div>
+                                    <div class="text-xs opacity-60">${r.cuisine || ''} • ${r.location || ''}</div>
+                                </div>
+                            </div>
                             <button class="view-menu-btn mt-2 text-sm bg-primary text-white px-3 py-1 rounded-full">View Menu</button>
                         </div>
                     `).join('')}
                 </div>
                 <div id="foodCartPanel" class="mt-4 border-t pt-3">
-                    <div class="flex justify-between items-center"><span class="font-bold">🛒 Cart</span><span id="cartCount">0 items</span></div>
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold">🛒 Cart</span>
+                        <span id="cartCount">0 items</span>
+                    </div>
                     <div id="cartItems" class="mt-2"></div>
-                    <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">Checkout (ZMW)</button>
+                    <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">Checkout (${CURRENCY}0.00)</button>
                 </div>
                 <div class="mt-4 border-t pt-3">
-                    <h4 class="font-bold">📜 My Food Orders</h4>
-                    <div id="foodOrderHistory" class="max-h-48 overflow-auto"></div>
+                    <h4 class="font-bold">📜 My Food Orders (live)</h4>
+                    <div id="foodOrderHistory" class="max-h-64 overflow-auto"></div>
                 </div>
             `;
+
+            // ---- View Menu buttons ----
             document.querySelectorAll('.view-menu-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const card = e.target.closest('.restaurant-card');
                     const name = card.querySelector('.font-bold').innerText;
                     const restaurant = allRestaurants.find(r => r.name === name);
                     if (!restaurant) return;
-                    let menuHtml = restaurant.items.map(item => `
-                        <div class="menu-item"><span>${item.name}</span><span>${CURRENCY}${item.price} <button class="add-to-cart-btn bg-primary text-white text-xs px-2 py-0.5 rounded-full" data-restaurant="${restaurant.name}" data-name="${item.name}" data-price="${item.price}">+</button></span></div>
+
+                    let menuHtml = restaurant.items.map((item, idx) => `
+                        <div class="menu-item flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span>${item.name}</span>
+                            <div class="flex items-center gap-2">
+                                <span>${CURRENCY}${item.price}</span>
+                                <div class="flex items-center gap-1">
+                                    <button class="qty-minus text-sm bg-gray-200 dark:bg-gray-700 px-2 rounded" data-idx="${idx}">−</button>
+                                    <span class="qty-display w-6 text-center" data-idx="${idx}">1</span>
+                                    <button class="qty-plus text-sm bg-gray-200 dark:bg-gray-700 px-2 rounded" data-idx="${idx}">+</button>
+                                </div>
+                                <button class="add-to-cart-btn bg-primary text-white text-xs px-3 py-1 rounded-full" 
+                                        data-restaurant="${restaurant.name}" 
+                                        data-name="${item.name}" 
+                                        data-price="${item.price}" 
+                                        data-idx="${idx}">Add</button>
+                            </div>
+                        </div>
                     `).join('');
+
                     Swal.fire({
                         title: `${restaurant.logo || '🍽️'} ${restaurant.name}`,
-                        html: `<div class="text-left">${menuHtml}</div>`,
+                        html: `<div class="text-left max-h-80 overflow-auto">${menuHtml}</div>`,
                         confirmButtonText: 'Close',
                         didOpen: () => {
+                            document.querySelectorAll('.qty-minus, .qty-plus').forEach(b => {
+                                b.addEventListener('click', () => {
+                                    const idx = parseInt(b.dataset.idx);
+                                    const display = document.querySelector(`.qty-display[data-idx="${idx}"]`);
+                                    let val = parseInt(display.textContent);
+                                    if (b.classList.contains('qty-minus')) val = Math.max(1, val - 1);
+                                    else val = Math.min(99, val + 1);
+                                    display.textContent = val;
+                                });
+                            });
+
                             document.querySelectorAll('.add-to-cart-btn').forEach(b => {
                                 b.addEventListener('click', () => {
                                     const rname = b.dataset.restaurant;
                                     const iname = b.dataset.name;
                                     const iprice = parseFloat(b.dataset.price);
+                                    const idx = parseInt(b.dataset.idx);
+                                    const qtyDisplay = document.querySelector(`.qty-display[data-idx="${idx}"]`);
+                                    const qty = parseInt(qtyDisplay.textContent);
+
                                     const existing = foodCart.find(x => x.restaurant === rname && x.name === iname);
-                                    if (existing) existing.qty = (existing.qty || 1) + 1;
-                                    else foodCart.push({ restaurant: rname, name: iname, price: iprice, qty: 1 });
+                                    if (existing) existing.qty += qty;
+                                    else foodCart.push({ restaurant: rname, name: iname, price: iprice, qty });
+
                                     updateCartUI();
-                                    Swal.fire({ title: 'Added!', icon: 'success', timer: 500, showConfirmButton: false });
+                                    Swal.fire({ title: `Added ${qty} × ${iname}`, icon: 'success', timer: 800, showConfirmButton: false });
                                 });
                             });
                         }
@@ -1148,79 +1221,104 @@
                 });
             });
 
+            // ---- Cart UI update ----
             const updateCartUI = () => {
                 const countSpan = document.getElementById('cartCount');
                 const itemsDiv = document.getElementById('cartItems');
-                if (countSpan) countSpan.innerText = foodCart.reduce((s,i) => s + i.qty, 0) + ' items';
+                const checkoutBtn = document.getElementById('checkoutFoodBtn');
+
+                if (countSpan) countSpan.innerText = foodCart.reduce((s, i) => s + i.qty, 0) + ' items';
+
                 if (itemsDiv) {
-                    if (foodCart.length === 0) itemsDiv.innerHTML = '<div class="text-sm opacity-60">Cart is empty</div>';
-                    else {
-                        itemsDiv.innerHTML = foodCart.map(i => `
-                            <div class="cart-item"><span>${i.name} × ${i.qty}</span><span>${CURRENCY}${(i.price * i.qty).toFixed(2)} <button class="remove-cart-item text-red-500 text-xs" data-name="${i.name}" data-restaurant="${i.restaurant}">✕</button></span></div>
+                    if (foodCart.length === 0) {
+                        itemsDiv.innerHTML = '<div class="text-sm opacity-60">Cart is empty</div>';
+                    } else {
+                        itemsDiv.innerHTML = foodCart.map((i, idx) => `
+                            <div class="cart-item flex justify-between items-center py-1 border-b border-gray-100 dark:border-gray-700">
+                                <span>${i.name} × ${i.qty}</span>
+                                <span class="flex items-center gap-2">
+                                    ${CURRENCY}${(i.price * i.qty).toFixed(2)}
+                                    <button class="remove-cart-item text-red-500 text-xs" data-index="${idx}">✕</button>
+                                </span>
+                            </div>
                         `).join('');
+
                         document.querySelectorAll('.remove-cart-item').forEach(b => {
                             b.addEventListener('click', () => {
-                                const name = b.dataset.name, restaurant = b.dataset.restaurant;
-                                foodCart = foodCart.filter(i => !(i.name === name && i.restaurant === restaurant));
+                                const idx = parseInt(b.dataset.index);
+                                foodCart.splice(idx, 1);
                                 updateCartUI();
                             });
                         });
                     }
                 }
-                const checkoutBtn = document.getElementById('checkoutFoodBtn');
+
                 if (checkoutBtn) {
-                    const total = foodCart.reduce((s,i) => s + i.price * i.qty, 0);
+                    const total = foodCart.reduce((s, i) => s + i.price * i.qty, 0);
                     checkoutBtn.innerText = `Checkout (${CURRENCY}${total.toFixed(2)})`;
                 }
             };
 
-            async function loadFoodOrderHistory() {
-                const snap = await getDocs(query(collection(db,"foodOrders"), where("customerId","==",currentUser.uid), orderBy("createdAt","desc")));
-                const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                const container = document.getElementById('foodOrderHistory');
-                if (!container) return;
-                if (orders.length === 0) {
-                    container.innerHTML = '<div class="text-sm opacity-60">No orders yet</div>';
-                    return;
-                }
-                container.innerHTML = orders.map(o => `
-                    <div class="border-b border-gray-100 dark:border-gray-700 py-2">
-                        <div class="flex justify-between"><span class="font-medium">Order #${o.id.substring(0,6)}</span><span class="text-sm ${o.status==='delivered'?'text-green-500':o.status==='accepted'?'text-blue-400':'text-amber-400'}">${o.status}</span></div>
-                        <div class="text-xs">${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}</div>
-                        <div class="text-xs text-gray-400">${CURRENCY}${o.total} • ${formatDate(o.createdAt)}</div>
-                    </div>
-                `).join('');
-            }
-
-            updateCartUI();
+            // ---- Checkout ----
             document.getElementById('checkoutFoodBtn').addEventListener('click', async () => {
-                if (foodCart.length === 0) return Swal.fire('Cart empty');
-                let deliveryAddr = tempPickupAddress || 'Not set';
-                if (!tempPickup) {
-                    const { value: addr } = await Swal.fire({ title: 'Delivery address', input: 'text', inputLabel: 'Enter address', inputValue: deliveryAddr });
-                    if (addr) deliveryAddr = addr;
-                    else return;
+                if (foodCart.length === 0) return Swal.fire('Cart empty', 'Add some items first.', 'info');
+
+                let deliveryAddr = tempPickupAddress || '';
+                if (!deliveryAddr) {
+                    const { value: addr } = await Swal.fire({
+                        title: 'Delivery address',
+                        input: 'text',
+                        inputLabel: 'Where should we deliver?',
+                        inputPlaceholder: 'e.g. 123 Main St, Lusaka',
+                        showCancelButton: true
+                    });
+                    if (!addr) return;
+                    deliveryAddr = addr;
                 }
+
                 const total = foodCart.reduce((sum, i) => sum + i.price * i.qty, 0);
-                const order = {
-                    customerId: currentUser.uid,
-                    customerName: currentUser.email,
-                    items: foodCart,
-                    total,
-                    deliveryAddress: deliveryAddr,
-                    status: 'pending',
-                    createdAt: serverTimestamp()
-                };
-                await addDoc(collection(db, "foodOrders"), order);
-                foodCart = [];
-                updateCartUI();
-                Swal.fire({ title: 'Order placed!', icon: 'success', timer: 2000 });
-                showNotification('Food order', 'Your food is being prepared');
-                loadFoodOrderHistory();
+
+                try {
+                    Swal.fire({ title: 'Placing order...', timer: 1500, didOpen: () => Swal.showLoading() });
+
+                    const order = {
+                        customerId: currentUser.uid,
+                        customerName: currentUser.email,
+                        items: foodCart.map(i => ({ name: i.name, price: i.price, qty: i.qty })),
+                        total,
+                        deliveryAddress: deliveryAddr,
+                        status: 'pending',
+                        driverId: null,
+                        driverName: null,
+                        createdAt: serverTimestamp()
+                    };
+                    await addDoc(collection(db, "foodOrders"), order);
+
+                    foodCart = [];
+                    updateCartUI();
+
+                    Swal.fire({ title: 'Order placed!', icon: 'success', timer: 2000, showConfirmButton: false });
+                    showNotification('Food order', 'Your order is being prepared.');
+                } catch (e) {
+                    Swal.fire('Error', e.message, 'error');
+                }
             });
 
-            loadFoodOrderHistory();
+            // ---- Real‑time food order listener ----
+            const q = query(
+                collection(db, "foodOrders"),
+                where("customerId", "==", currentUser.uid),
+                orderBy("createdAt", "desc")
+            );
+            foodOrdersUnsubscribe = onSnapshot(q, (snap) => {
+                foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateOrderHistory();
+            });
+
+            // Initial cart render
+            updateCartUI();
         };
+
         loadRestaurants();
     }
 
@@ -1425,7 +1523,6 @@
             renderCustomerTabs();
         };
 
-        // ---- IMPROVED: Unified dropdown handling (same as customer) ----
         const dropdownMenu = document.getElementById('dropdownMenu');
         const hamburgerBtn = document.getElementById('hamburgerBtn');
 
