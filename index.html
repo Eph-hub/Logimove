@@ -206,6 +206,19 @@
         }
         .language-selector:focus { border-color: var(--primary); }
 
+        .sync-btn {
+            background: var(--primary-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 2rem;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .sync-btn:hover { background: var(--primary); color: white; }
+        .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         @media (max-width: 640px) { .map-container { height: 200px; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } .sos-btn { width: 48px; height: 48px; font-size: 1.2rem; } }
     </style>
 </head>
@@ -240,356 +253,166 @@
         en: {
             appName: 'LogiMoves Zm',
             tagline: '• Ride • Delivery • Food',
-            login: 'Login',
-            email: 'Email',
-            password: 'Password',
-            newCustomer: 'New Customer',
-            newDriver: 'New Driver',
-            registerCustomer: 'Register as Customer',
-            registerDriver: 'Register as Driver',
-            fullName: 'Full name',
-            phone: 'Phone (e.g. 0977...)',
-            carModel: 'Car model',
-            plate: 'Licence plate',
-            lightMode: '☀️ Light Mode',
-            darkMode: '🌙 Dark Mode',
-            theme: '🎨 Theme',
-            logout: 'Logout',
-            profile: 'Profile',
-            rides: 'Rides',
-            food: 'Food',
-            shops: 'Shops',
-            cargo: 'Cargo',
-            history: 'History',
-            home: 'Home',
-            available: 'Available',
-            active: 'Active',
-            earnings: 'Earnings',
-            dashboard: 'Dashboard',
-            support: 'Support',
-            inviteFriends: 'Invite Friends',
-            myLocation: '📍 My location',
-            swap: '🔄 Swap',
-            save: '💾 Save',
-            homePlace: '🏠 Home',
-            workPlace: '🏢 Work',
-            search: '🔍 Search',
-            getEstimate: '💰 Get Estimate',
-            request: 'Request',
-            requestTaxi: 'Request Taxi',
-            requestCargo: 'Request Cargo',
-            pickup: 'Pickup',
-            dropoff: 'Dropoff',
-            distance: '📏 Distance',
-            eta: '⏱️ ETA',
-            price: '💰 Price',
-            estimateRange: '📊 Estimate range',
-            promoCode: 'Promo code',
-            apply: 'Apply',
-            payment: 'Payment',
-            passenger: 'passenger',
-            passengers: 'passengers',
-            itemDesc: 'Item description',
-            weight: 'Weight (kg)',
-            dimensions: 'Dimensions (LxWxH cm)',
-            addStop: '+ Add Stop',
-            removeStop: '✕',
-            sos: '🆘',
-            sosAlert: '🚨 SOS Sent!',
+            login: 'Login', email: 'Email', password: 'Password',
+            newCustomer: 'New Customer', newDriver: 'New Driver',
+            registerCustomer: 'Register as Customer', registerDriver: 'Register as Driver',
+            fullName: 'Full name', phone: 'Phone (e.g. 0977...)', carModel: 'Car model', plate: 'Licence plate',
+            lightMode: '☀️ Light Mode', darkMode: '🌙 Dark Mode', theme: '🎨 Theme',
+            logout: 'Logout', profile: 'Profile', rides: 'Rides', food: 'Food', shops: 'Shops', cargo: 'Cargo',
+            history: 'History', home: 'Home', available: 'Available', active: 'Active', earnings: 'Earnings',
+            dashboard: 'Dashboard', support: 'Support', inviteFriends: 'Invite Friends',
+            myLocation: '📍 My location', swap: '🔄 Swap', save: '💾 Save',
+            homePlace: '🏠 Home', workPlace: '🏢 Work', search: '🔍 Search',
+            getEstimate: '💰 Get Estimate', request: 'Request', requestTaxi: 'Request Taxi', requestCargo: 'Request Cargo',
+            pickup: 'Pickup', dropoff: 'Dropoff', distance: '📏 Distance', eta: '⏱️ ETA',
+            price: '💰 Price', estimateRange: '📊 Estimate range', promoCode: 'Promo code', apply: 'Apply',
+            payment: 'Payment', passenger: 'passenger', passengers: 'passengers',
+            itemDesc: 'Item description', weight: 'Weight (kg)', dimensions: 'Dimensions (LxWxH cm)',
+            addStop: '+ Add Stop', removeStop: '✕', sos: '🆘', sosAlert: '🚨 SOS Sent!',
             sosDesc: 'Driver and emergency contact have been notified.',
-            emergencyContact: 'Emergency Contact',
-            setEmergency: 'Set Emergency Contact',
-            rateDriver: '⭐ Rate Driver',
-            rateCustomer: '⭐ Rate Customer',
-            rating: 'Rating (1-5)',
-            comment: 'Comment (optional)',
-            submit: 'Submit',
-            close: 'Close',
-            editProfile: '✏️ Edit Profile',
-            defaultPlaces: '🏠 Default Places',
-            setHome: 'Set Home',
-            setWork: 'Set Work',
-            clearDefaults: 'Clear',
-            frequentTrips: '⭐ Frequent:',
-            noTrips: 'No past trips or food orders',
-            viewRoute: 'View route',
-            orderFood: '🍔 Order Food',
-            cart: '🛒 Cart',
-            checkout: 'Checkout',
-            cartEmpty: 'Cart is empty',
-            addItems: 'Add some items first.',
-            deliveryAddress: 'Delivery address',
-            whereDeliver: 'Where should we deliver?',
-            placingOrder: 'Placing order...',
-            orderPlaced: 'Order placed!',
+            emergencyContact: 'Emergency Contact', setEmergency: 'Set Emergency Contact',
+            rateDriver: '⭐ Rate Driver', rateCustomer: '⭐ Rate Customer',
+            rating: 'Rating (1-5)', comment: 'Comment (optional)', submit: 'Submit',
+            close: 'Close', editProfile: '✏️ Edit Profile', defaultPlaces: '🏠 Default Places',
+            setHome: 'Set Home', setWork: 'Set Work', clearDefaults: 'Clear',
+            frequentTrips: '⭐ Frequent:', noTrips: 'No past trips or food orders',
+            viewRoute: 'View route', orderFood: '🍔 Order Food', cart: '🛒 Cart',
+            checkout: 'Checkout', cartEmpty: 'Cart is empty', addItems: 'Add some items first.',
+            deliveryAddress: 'Delivery address', whereDeliver: 'Where should we deliver?',
+            placingOrder: 'Placing order...', orderPlaced: 'Order placed!',
             orderPreparing: 'Your order is being prepared.',
-            myOrders: '📜 My Food Orders (live)',
-            noOrders: 'No orders yet',
-            driverEnRoute: 'Driver en route',
-            shareTracking: '🔗 Share tracking link',
-            linkCopied: 'Link copied!',
-            today: 'Today',
-            week: 'Week',
-            total: 'Total',
-            completedTrips: 'Completed trips',
-            avgPerTrip: 'Avg per trip',
-            last7Days: 'Last 7 Days',
-            revenuePerDay: '📈 Revenue per day',
+            myOrders: '📜 My Food Orders (live)', noOrders: 'No orders yet',
+            driverEnRoute: 'Driver en route', shareTracking: '🔗 Share tracking link',
+            linkCopied: 'Link copied!', today: 'Today', week: 'Week', total: 'Total',
+            completedTrips: 'Completed trips', avgPerTrip: 'Avg per trip',
+            last7Days: 'Last 7 Days', revenuePerDay: '📈 Revenue per day',
             topDrivers: '🏆 Top Drivers (by earnings)',
-            userManagement: '👤 User Management',
-            suspend: 'Suspend',
-            reset: 'Reset',
-            help: 'Help',
-            faq: 'Frequently Asked Questions',
-            supportTicket: 'Support Ticket',
-            submitTicket: 'Submit Ticket',
-            subject: 'Subject',
-            message: 'Message',
-            ticketSubmitted: 'Ticket submitted!',
-            referralCode: 'Your Referral Code:',
-            inviteFriendsText: 'Invite friends and earn discounts!',
-            shareCode: 'Share Code',
-            referDesc: 'When your friend signs up and takes their first ride, you both get 10% off!',
+            userManagement: '👤 User Management', suspend: 'Suspend', reset: 'Reset',
+            help: 'Help', faq: 'Frequently Asked Questions',
+            supportTicket: 'Support Ticket', submitTicket: 'Submit Ticket',
+            subject: 'Subject', message: 'Message', ticketSubmitted: 'Ticket submitted!',
+            referralCode: 'Your Referral Code:', inviteFriendsText: 'Invite friends and earn discounts!',
+            shareCode: 'Share Code', referDesc: 'When your friend signs up and takes their first ride, you both get 10% off!',
             referralDiscount: '🎉 Referral discount applied!',
             offline: 'You are offline. Some features may be limited.',
-            online: 'You are back online.',
-            cachedData: 'Showing cached data.',
+            online: 'You are back online.', cachedData: 'Showing cached data.',
+            sync: '🔄 Sync', syncing: 'Syncing...', syncComplete: 'Sync complete!',
+            ratingSummary: '⭐ Rating Summary',
+            customerRating: 'Customer Rating', driverRating: 'Driver Rating',
+            noRequests: 'No requests yet', accepted: 'Accepted', delivered: 'Delivered',
+            pending: 'Pending', pickedUp: 'Picked Up',
+            cancel: 'Cancel', cancelRide: 'Cancel Ride',
+            confirmCancel: 'Are you sure you want to cancel this ride?',
+            canceled: 'Canceled', tripCanceled: 'Trip canceled successfully.',
+            viewOnMap: 'View on Map',
         },
         bem: {
             appName: 'LogiMoves Zm',
             tagline: '• Ride • Delivery • Food',
-            login: 'Kwinjila',
-            email: 'Imeili',
-            password: 'Akasuubilo',
-            newCustomer: 'Mwabuka ukuya',
-            newDriver: 'Mwabuka ukuya (Driver)',
-            registerCustomer: 'Lembelela',
-            registerDriver: 'Lembelela (Driver)',
-            fullName: 'Ishina lyonse',
-            phone: 'Namba (e.g. 0977...)',
-            carModel: 'Moto model',
-            plate: 'Namba ya moto',
-            lightMode: '☀️ Kwase',
-            darkMode: '🌙 Kufi',
-            theme: '🎨 Mitundu',
-            logout: 'Fumako',
-            profile: 'Umuntu',
-            rides: 'Ma Ride',
-            food: 'Food',
-            shops: 'Tishopo',
-            cargo: 'Cargo',
-            history: 'Mbuyi',
-            home: 'Pango',
-            available: 'Zilipo',
-            active: 'Zililetewa',
-            earnings: 'Indalama',
-            dashboard: 'Dashboard',
-            support: 'Support',
-            inviteFriends: 'Itanani bantu',
-            myLocation: '📍 Le fyo ndi',
-            swap: '🔄 Shibanya',
-            save: '💾 Sungwila',
-            homePlace: '🏠 Pango',
-            workPlace: '🏢 Mukoti',
-            search: '🔍 Afumbanya',
-            getEstimate: '💰 Lola indalama',
-            request: 'Pepa',
-            requestTaxi: 'Pepa Taxi',
-            requestCargo: 'Pepa Cargo',
-            pickup: 'Ku Pita',
-            dropoff: 'Ku Mona',
-            distance: '📏 Mutunda',
-            eta: '⏱️ Ndi shani',
-            price: '💰 Indalama',
-            estimateRange: '📊 Mitundu ya indalama',
-            promoCode: 'Code ya promo',
-            apply: 'Ikonesha',
-            payment: 'Malipilo',
-            passenger: 'muntu umo',
-            passengers: 'bantu',
-            itemDesc: 'Ifyo cili',
-            weight: 'Ubulemu (kg)',
-            dimensions: 'Ubunini (LxWxH cm)',
-            addStop: '+ Onjezako Stop',
-            removeStop: '✕ Fumako',
-            sos: '🆘 SOS',
-            sosAlert: '🚨 SOS Yatumwa!',
-            sosDesc: 'Driver na emergency contact bashililwe.',
-            emergencyContact: 'Emergency Contact',
-            setEmergency: 'Shimika Emergency Contact',
-            rateDriver: '⭐ Palemba Driver',
-            rateCustomer: '⭐ Palemba Customer',
-            rating: 'Palemba (1-5)',
-            comment: 'Comment (opile)',
-            submit: 'Tumako',
-            close: 'Sala',
-            editProfile: '✏️ Shintulako',
-            defaultPlaces: '🏠 Mwamwi wa misango',
-            setHome: 'Shimika Pango',
-            setWork: 'Shimika Mukoti',
-            clearDefaults: 'Fumako fyonse',
-            frequentTrips: '⭐ Fyafuba:',
-            noTrips: 'Twaikala inshila',
-            viewRoute: 'Lola inshila',
-            orderFood: '🍔 Pepa Food',
-            cart: '🛒 Cart',
-            checkout: 'Lipila',
-            cartEmpty: 'Cart yaikala',
-            addItems: 'Onjezako fintu.',
-            deliveryAddress: 'Apo kutumya',
-            whereDeliver: 'Apo kutumya?',
-            placingOrder: 'Kupanga order...',
-            orderPlaced: 'Order yapangwa!',
+            login: 'Kwinjila', email: 'Imeili', password: 'Akasuubilo',
+            newCustomer: 'Mwabuka ukuya', newDriver: 'Mwabuka ukuya (Driver)',
+            registerCustomer: 'Lembelela', registerDriver: 'Lembelela (Driver)',
+            fullName: 'Ishina lyonse', phone: 'Namba (e.g. 0977...)', carModel: 'Moto model', plate: 'Namba ya moto',
+            lightMode: '☀️ Kwase', darkMode: '🌙 Kufi', theme: '🎨 Mitundu',
+            logout: 'Fumako', profile: 'Umuntu', rides: 'Ma Ride', food: 'Food', shops: 'Tishopo', cargo: 'Cargo',
+            history: 'Mbuyi', home: 'Pango', available: 'Zilipo', active: 'Zililetewa', earnings: 'Indalama',
+            dashboard: 'Dashboard', support: 'Support', inviteFriends: 'Itanani bantu',
+            myLocation: '📍 Le fyo ndi', swap: '🔄 Shibanya', save: '💾 Sungwila',
+            homePlace: '🏠 Pango', workPlace: '🏢 Mukoti', search: '🔍 Afumbanya',
+            getEstimate: '💰 Lola indalama', request: 'Pepa', requestTaxi: 'Pepa Taxi', requestCargo: 'Pepa Cargo',
+            pickup: 'Ku Pita', dropoff: 'Ku Mona', distance: '📏 Mutunda', eta: '⏱️ Ndi shani',
+            price: '💰 Indalama', estimateRange: '📊 Mitundu ya indalama', promoCode: 'Code ya promo', apply: 'Ikonesha',
+            payment: 'Malipilo', passenger: 'muntu umo', passengers: 'bantu',
+            itemDesc: 'Ifyo cili', weight: 'Ubulemu (kg)', dimensions: 'Ubunini (LxWxH cm)',
+            addStop: '+ Onjezako Stop', removeStop: '✕ Fumako', sos: '🆘 SOS',
+            sosAlert: '🚨 SOS Yatumwa!', sosDesc: 'Driver na emergency contact bashililwe.',
+            emergencyContact: 'Emergency Contact', setEmergency: 'Shimika Emergency Contact',
+            rateDriver: '⭐ Palemba Driver', rateCustomer: '⭐ Palemba Customer',
+            rating: 'Palemba (1-5)', comment: 'Comment (opile)', submit: 'Tumako',
+            close: 'Sala', editProfile: '✏️ Shintulako', defaultPlaces: '🏠 Mwamwi wa misango',
+            setHome: 'Shimika Pango', setWork: 'Shimika Mukoti', clearDefaults: 'Fumako fyonse',
+            frequentTrips: '⭐ Fyafuba:', noTrips: 'Twaikala inshila',
+            viewRoute: 'Lola inshila', orderFood: '🍔 Pepa Food', cart: '🛒 Cart',
+            checkout: 'Lipila', cartEmpty: 'Cart yaikala', addItems: 'Onjezako fintu.',
+            deliveryAddress: 'Apo kutumya', whereDeliver: 'Apo kutumya?',
+            placingOrder: 'Kupanga order...', orderPlaced: 'Order yapangwa!',
             orderPreparing: 'Order yalekelelwa.',
-            myOrders: '📜 Ma Order yandi',
-            noOrders: 'Taikala ma order',
-            driverEnRoute: 'Driver ali munjila',
-            shareTracking: '🔗 Shile tracking link',
-            linkCopied: 'Link yakoswa!',
-            today: 'Leelo',
-            week: 'Mulungu',
-            total: 'Fyonse',
-            completedTrips: 'Inshila zapitile',
-            avgPerTrip: 'Pa mutunda',
-            last7Days: 'Masiku 7 apitile',
-            revenuePerDay: '📈 Indalama pa mutunda',
+            myOrders: '📜 Ma Order yandi', noOrders: 'Taikala ma order',
+            driverEnRoute: 'Driver ali munjila', shareTracking: '🔗 Shile tracking link',
+            linkCopied: 'Link yakoswa!', today: 'Leelo', week: 'Mulungu', total: 'Fyonse',
+            completedTrips: 'Inshila zapitile', avgPerTrip: 'Pa mutunda',
+            last7Days: 'Masiku 7 apitile', revenuePerDay: '📈 Indalama pa mutunda',
             topDrivers: '🏆 Aba Driver abalamba',
-            userManagement: '👤 Ukwimilila bantu',
-            suspend: 'Supa',
-            reset: 'Shintulako',
-            help: 'Mafwilisho',
-            faq: 'Mafwilisho',
-            supportTicket: 'Support Ticket',
-            submitTicket: 'Tumako Ticket',
-            subject: 'Mutwe',
-            message: 'Ubutumwa',
-            ticketSubmitted: 'Ticket yatumwa!',
-            referralCode: 'Code yako ya Referral:',
-            inviteFriendsText: 'Itanani bantu na muponwe indalama!',
-            shareCode: 'Shile Code',
-            referDesc: 'Muntu nga ale lemba no kufika, mwabelesha 10% off!',
+            userManagement: '👤 Ukwimilila bantu', suspend: 'Supa', reset: 'Shintulako',
+            help: 'Mafwilisho', faq: 'Mafwilisho',
+            supportTicket: 'Support Ticket', submitTicket: 'Tumako Ticket',
+            subject: 'Mutwe', message: 'Ubutumwa', ticketSubmitted: 'Ticket yatumwa!',
+            referralCode: 'Code yako ya Referral:', inviteFriendsText: 'Itanani bantu na muponwe indalama!',
+            shareCode: 'Shile Code', referDesc: 'Muntu nga ale lemba no kufika, mwabelesha 10% off!',
             referralDiscount: '🎉 Indalama ya referral yaba!',
             offline: 'Muli offline. Fintu fimo tailekela.',
-            online: 'Mwabwela online.',
-            cachedData: 'Mwamwi wa data yakusungwa.',
+            online: 'Mwabwela online.', cachedData: 'Mwamwi wa data yakusungwa.',
+            sync: '🔄 Synka', syncing: 'Synka...', syncComplete: 'Synka yabwela!',
+            ratingSummary: '⭐ Palemba', customerRating: 'Palemba ya Customer',
+            driverRating: 'Palemba ya Driver', noRequests: 'Taikala ma request',
+            accepted: 'Acepted', delivered: 'Delivered', pending: 'Pending',
+            pickedUp: 'Picked Up', cancel: 'Kana', cancelRide: 'Kana Ride',
+            confirmCancel: 'Ushaka kana ride iyi?', canceled: 'Kanilwe',
+            tripCanceled: 'Ride yakanilwe.', viewOnMap: 'Lola pa Map',
         },
         nya: {
             appName: 'LogiMoves Zm',
             tagline: '• Ride • Delivery • Food',
-            login: 'Lowalowa',
-            email: 'Email',
-            password: 'Mawu achinsinsi',
-            newCustomer: 'Watsopano Kasitomala',
-            newDriver: 'Watsopano Driver',
-            registerCustomer: 'Lembetsani Kasitomala',
-            registerDriver: 'Lembetsani Driver',
-            fullName: 'Dzina lathunthu',
-            phone: 'Nambala (monga 0977...)',
-            carModel: 'Mtundu wa galimoto',
-            plate: 'Nambala ya galimoto',
-            lightMode: '☀️ Kuwala',
-            darkMode: '🌙 Mdima',
-            theme: '🎨 Mitundu',
-            logout: 'Tulukani',
-            profile: 'Mbiri',
-            rides: 'Ma Ride',
-            food: 'Zakudya',
-            shops: 'Mashopu',
-            cargo: 'Katundu',
-            history: 'Mbiri',
-            home: 'Kunyumba',
-            available: 'Zilipo',
-            active: 'Zikuchitika',
-            earnings: 'Ndalama',
-            dashboard: 'Dashboard',
-            support: 'Thandizo',
-            inviteFriends: 'Itanani anzako',
-            myLocation: '📍 Kumene ndili',
-            swap: '🔄 Sinthani',
-            save: '💾 Sungani',
-            homePlace: '🏠 Kunyumba',
-            workPlace: '🏢 Ku ntchito',
-            search: '🔍 Fufuzani',
-            getEstimate: '💰 Onani ndalama',
-            request: 'Pemphani',
-            requestTaxi: 'Pemphani Taxi',
-            requestCargo: 'Pemphani Katundu',
-            pickup: 'Kunyamula',
-            dropoff: 'Kubweretsa',
-            distance: '📏 Mtunda',
-            eta: '⏱️ Nthawi',
-            price: '💰 Mtengo',
-            estimateRange: '📊 Mtengo woyerekeza',
-            promoCode: 'Code ya promo',
-            apply: 'Gwiritsani',
-            payment: 'Kulipira',
-            passenger: 'wokwera mmodzi',
-            passengers: 'okwera',
-            itemDesc: 'Kufotokoza katundu',
-            weight: 'Kulemera (kg)',
-            dimensions: 'Kukula (LxWxH cm)',
-            addStop: '+ Onjezani Stop',
-            removeStop: '✕ Chotsani',
-            sos: '🆘 SOS',
-            sosAlert: '🚨 SOS Yatumizidwa!',
-            sosDesc: 'Driver ndi emergency contact aziwitsidwa.',
-            emergencyContact: 'Emergency Contact',
-            setEmergency: 'Ikani Emergency Contact',
-            rateDriver: '⭐ Patsani Driver',
-            rateCustomer: '⭐ Patsani Kasitomala',
-            rating: 'Mavoti (1-5)',
-            comment: 'Ndemanga (ngati mukufuna)',
-            submit: 'Tumizani',
-            close: 'Tsekani',
-            editProfile: '✏️ Sinthani',
-            defaultPlaces: '🏠 Malo okhazikika',
-            setHome: 'Ikani Kunyumba',
-            setWork: 'Ikani Ku ntchito',
-            clearDefaults: 'Chotsani',
-            frequentTrips: '⭐ Maulendo:',
-            noTrips: 'Palibe maulendo kapena zakudya',
-            viewRoute: 'Onani njira',
-            orderFood: '🍔 Pemphani Zakudya',
-            cart: '🛒 Cart',
-            checkout: 'Lipirani',
-            cartEmpty: 'Cart yopanda kanthu',
-            addItems: 'Onjezani zinthu.',
-            deliveryAddress: 'Adilesi yobweretsera',
-            whereDeliver: 'Kubweretsa kuti?',
-            placingOrder: 'Kupanga order...',
-            orderPlaced: 'Order yapangidwa!',
+            login: 'Lowalowa', email: 'Email', password: 'Mawu achinsinsi',
+            newCustomer: 'Watsopano Kasitomala', newDriver: 'Watsopano Driver',
+            registerCustomer: 'Lembetsani Kasitomala', registerDriver: 'Lembetsani Driver',
+            fullName: 'Dzina lathunthu', phone: 'Nambala (monga 0977...)', carModel: 'Mtundu wa galimoto', plate: 'Nambala ya galimoto',
+            lightMode: '☀️ Kuwala', darkMode: '🌙 Mdima', theme: '🎨 Mitundu',
+            logout: 'Tulukani', profile: 'Mbiri', rides: 'Ma Ride', food: 'Zakudya', shops: 'Mashopu', cargo: 'Katundu',
+            history: 'Mbiri', home: 'Kunyumba', available: 'Zilipo', active: 'Zikuchitika', earnings: 'Ndalama',
+            dashboard: 'Dashboard', support: 'Thandizo', inviteFriends: 'Itanani anzako',
+            myLocation: '📍 Kumene ndili', swap: '🔄 Sinthani', save: '💾 Sungani',
+            homePlace: '🏠 Kunyumba', workPlace: '🏢 Ku ntchito', search: '🔍 Fufuzani',
+            getEstimate: '💰 Onani ndalama', request: 'Pemphani', requestTaxi: 'Pemphani Taxi', requestCargo: 'Pemphani Katundu',
+            pickup: 'Kunyamula', dropoff: 'Kubweretsa', distance: '📏 Mtunda', eta: '⏱️ Nthawi',
+            price: '💰 Mtengo', estimateRange: '📊 Mtengo woyerekeza', promoCode: 'Code ya promo', apply: 'Gwiritsani',
+            payment: 'Kulipira', passenger: 'wokwera mmodzi', passengers: 'okwera',
+            itemDesc: 'Kufotokoza katundu', weight: 'Kulemera (kg)', dimensions: 'Kukula (LxWxH cm)',
+            addStop: '+ Onjezani Stop', removeStop: '✕ Chotsani', sos: '🆘 SOS',
+            sosAlert: '🚨 SOS Yatumizidwa!', sosDesc: 'Driver ndi emergency contact aziwitsidwa.',
+            emergencyContact: 'Emergency Contact', setEmergency: 'Ikani Emergency Contact',
+            rateDriver: '⭐ Patsani Driver', rateCustomer: '⭐ Patsani Kasitomala',
+            rating: 'Mavoti (1-5)', comment: 'Ndemanga (ngati mukufuna)', submit: 'Tumizani',
+            close: 'Tsekani', editProfile: '✏️ Sinthani', defaultPlaces: '🏠 Malo okhazikika',
+            setHome: 'Ikani Kunyumba', setWork: 'Ikani Ku ntchito', clearDefaults: 'Chotsani',
+            frequentTrips: '⭐ Maulendo:', noTrips: 'Palibe maulendo kapena zakudya',
+            viewRoute: 'Onani njira', orderFood: '🍔 Pemphani Zakudya', cart: '🛒 Cart',
+            checkout: 'Lipirani', cartEmpty: 'Cart yopanda kanthu', addItems: 'Onjezani zinthu.',
+            deliveryAddress: 'Adilesi yobweretsera', whereDeliver: 'Kubweretsa kuti?',
+            placingOrder: 'Kupanga order...', orderPlaced: 'Order yapangidwa!',
             orderPreparing: 'Order ikukonzekera.',
-            myOrders: '📜 Ma Order anga',
-            noOrders: 'Palibe ma order',
-            driverEnRoute: 'Driver ali pa njira',
-            shareTracking: '🔗 Gawani tracking link',
-            linkCopied: 'Link yasindikizidwa!',
-            today: 'Lero',
-            week: 'Sabata',
-            total: 'Zonse',
-            completedTrips: 'Maulendo omalizidwa',
-            avgPerTrip: 'Pawulendo',
-            last7Days: 'Masiku 7 apitawa',
-            revenuePerDay: '📈 Ndalama patsiku',
+            myOrders: '📜 Ma Order anga', noOrders: 'Palibe ma order',
+            driverEnRoute: 'Driver ali pa njira', shareTracking: '🔗 Gawani tracking link',
+            linkCopied: 'Link yasindikizidwa!', today: 'Lero', week: 'Sabata', total: 'Zonse',
+            completedTrips: 'Maulendo omalizidwa', avgPerTrip: 'Pawulendo',
+            last7Days: 'Masiku 7 apitawa', revenuePerDay: '📈 Ndalama patsiku',
             topDrivers: '🏆 Oyang&#39;anira galimoto abwino',
-            userManagement: '👤 Kasamalidwe ka ogwiritsa',
-            suspend: 'Kaimitsani',
-            reset: 'Konzani',
-            help: 'Thandizo',
-            faq: 'Mafunso ofunsidwa kawirikawiri',
-            supportTicket: 'Ticket yothandizira',
-            submitTicket: 'Tumizani Ticket',
-            subject: 'Mutu',
-            message: 'Uthenga',
-            ticketSubmitted: 'Ticket yatumizidwa!',
-            referralCode: 'Code yanu ya Referral:',
-            inviteFriendsText: 'Itanani anzako ndi kupeza ndalama!',
-            shareCode: 'Gawani Code',
-            referDesc: 'Ngati mnzanu alembetsa ndi kukwera, nonse mupeza 10% off!',
+            userManagement: '👤 Kasamalidwe ka ogwiritsa', suspend: 'Kaimitsani', reset: 'Konzani',
+            help: 'Thandizo', faq: 'Mafunso ofunsidwa kawirikawiri',
+            supportTicket: 'Ticket yothandizira', submitTicket: 'Tumizani Ticket',
+            subject: 'Mutu', message: 'Uthenga', ticketSubmitted: 'Ticket yatumizidwa!',
+            referralCode: 'Code yanu ya Referral:', inviteFriendsText: 'Itanani anzako ndi kupeza ndalama!',
+            shareCode: 'Gawani Code', referDesc: 'Ngati mnzanu alembetsa ndi kukwera, nonse mupeza 10% off!',
             referralDiscount: '🎉 Ndalama ya referral yagwiritsidwa!',
             offline: 'Muli offline. Zinthu zina sizingagwire.',
-            online: 'Mwabwerera online.',
-            cachedData: 'Kuwonetsa zosungidwa.',
+            online: 'Mwabwerera online.', cachedData: 'Kuwonetsa zosungidwa.',
+            sync: '🔄 Sinya', syncing: 'Kusinya...', syncComplete: 'Kusinya kwatha!',
+            ratingSummary: '⭐ Mavoti', customerRating: 'Mavoti a Kasitomala',
+            driverRating: 'Mavoti a Driver', noRequests: 'Palibe zopempha',
+            accepted: 'Zavomerezedwa', delivered: 'Zaperekedwa', pending: 'Zikuyembekezera',
+            pickedUp: 'Zatengedwa', cancel: 'Letsani', cancelRide: 'Letsani ulendo',
+            confirmCancel: 'Mukufuna kuletsa ulendowu?', canceled: 'Waletsedwa',
+            tripCanceled: 'Ulendo waletsedwa.', viewOnMap: 'Onani pa Map',
         }
     };
 
@@ -602,7 +425,7 @@
     let currentUser = null, currentRole = null;
     let tempPickup = null, tempDropoff = null;
     let tempPickupAddress = null, tempDropoffAddress = null;
-    let tempStops = []; // array of {lat, lng, address}
+    let tempStops = [];
     let serviceType = "taxi";
     let customerMap, driverMap;
     let pickupMarker, dropoffMarker, driverMarker;
@@ -632,6 +455,7 @@
     const PROMO_CODES = { 'SAVE10': 0.10, 'SAVE20': 0.20, 'FREE': 0.00 };
     let offline = !navigator.onLine;
     let referralCode = '';
+    let isSyncing = false;
 
     const RATES = { taxi: { base: 20, perKm: 5 }, delivery: { base: 30, perKm: 10 }, cargo: { base: 50, perKm: 15 } };
     const CURRENCY = "K";
@@ -650,7 +474,6 @@
         if (vehicleType === 'Bike') { base *= 0.7; perKm *= 0.8; }
         else if (vehicleType === 'Truck') { base *= 1.5; perKm *= 1.3; }
         let price = base + dist * perKm;
-        // Extra stops: add 5 per stop
         price += (stops || 0) * 5;
         if (serviceType === 'delivery' || serviceType === 'cargo') {
             const w = parseFloat(weight) || 0;
@@ -744,7 +567,6 @@
     function updatePriceDisplay(vehicleType = 'Car', weight = 0, dims = '', stops = 0) {
         if (!tempPickup || !tempDropoff) return;
         let dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
-        // Add distance for each stop? For simplicity, we'll just use direct distance + stop penalty
         const price = calculatePrice(dist, vehicleType, weight, dims, stops);
         const pInput = document.getElementById('priceInput');
         if (pInput) pInput.value = price;
@@ -814,14 +636,41 @@
     }
 
     async function applyReferral(referrerId) {
-        // When a new user signs up with a referral code, give discount to both
-        // We'll store referral in user doc
         if (!currentUser) return;
         await updateDoc(doc(db, "users", currentUser.uid), { referredBy: referrerId });
-        // Award discount: store in promo codes for user
         await updateDoc(doc(db, "users", referrerId), { referralDiscount: increment(1) });
-        // Apply a one-time discount to new user
-        await updateDoc(doc(db, "users", currentUser.uid), { newUserDiscount: 0.10 }); // 10% off
+        await updateDoc(doc(db, "users", currentUser.uid), { newUserDiscount: 0.10 });
+    }
+
+    // ---------- SYNC ----------
+    async function syncData() {
+        if (isSyncing) return;
+        if (!navigator.onLine) {
+            Swal.fire({ title: t('offline'), icon: 'warning', timer: 1500 });
+            return;
+        }
+        isSyncing = true;
+        document.getElementById('syncBtn').disabled = true;
+        document.getElementById('syncBtn').innerHTML = t('syncing') + '...';
+        try {
+            // Re-fetch all data
+            const reqSnap = await getDocs(query(collection(db,"requests"), orderBy("createdAt", "desc")));
+            allRequests = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Update UI
+            if (currentRole === 'customer') renderCustomerTabs();
+            else if (currentRole === 'driver') renderDriverTabs();
+            else if (currentRole === 'admin') renderAdminPanel();
+            // Clear cache and re-cache
+            localStorage.setItem('cachedRequests', JSON.stringify(allRequests));
+            localStorage.setItem('cachedUser', JSON.stringify(currentUser));
+            Swal.fire({ title: t('syncComplete'), icon: 'success', timer: 1500 });
+        } catch (e) {
+            Swal.fire({ title: 'Sync error', text: e.message, icon: 'error' });
+        } finally {
+            isSyncing = false;
+            document.getElementById('syncBtn').disabled = false;
+            document.getElementById('syncBtn').innerHTML = t('sync');
+        }
     }
 
     // ---------- AUTH ----------
@@ -845,11 +694,9 @@
                 plate:extra.plate||''
             });
         }
-        // Check for referral code in URL params (from shared link)
         const urlParams = new URLSearchParams(window.location.search);
         const ref = urlParams.get('ref');
         if (ref) {
-            // Find user with that referral code
             const userSnap = await getDocs(query(collection(db, "users"), where("referralCode", "==", ref)));
             if (!userSnap.empty) {
                 const referrerId = userSnap.docs[0].id;
@@ -881,7 +728,6 @@
             defaultWork = data.defaultWork || null;
             frequentTrips = data.frequentTrips || [];
         }
-        // Load language preference
         const lang = await getDoc(doc(db, "userPreferences", uid));
         if (lang.exists()) {
             const l = lang.data().language;
@@ -914,7 +760,6 @@
                 renderCustomerTabs();
             } else if (currentRole === 'driver') renderDriverTabs();
             else if (currentRole === 'admin') renderAdminPanel();
-            // Cache data for offline
             if (navigator.onLine) {
                 localStorage.setItem('cachedRequests', JSON.stringify(allRequests));
                 localStorage.setItem('cachedUser', JSON.stringify(currentUser));
@@ -1098,18 +943,15 @@
         if(currentUser.email==='admin@logimove.com'){currentRole='admin'; renderAdminPanel();}
         else if(currentRole==='customer') renderCustomerTabs();
         else renderDriverTabs();
-        // Check offline
         if (!navigator.onLine) {
             offline = true;
             Swal.fire({ title: t('offline'), icon: 'warning', timer: 2000 });
-            // Load cached data
             const cached = localStorage.getItem('cachedRequests');
             if (cached) {
                 allRequests = JSON.parse(cached);
                 renderCustomerTabs();
             }
         }
-        // Load referral code
         getReferralCode().then(code => { referralCode = code; });
     }
 
@@ -1168,6 +1010,7 @@
                         <option value="bem" ${currentLang==='bem'?'selected':''}>BEM</option>
                         <option value="nya" ${currentLang==='nya'?'selected':''}>NYA</option>
                     </select>
+                    <button id="syncBtn" class="sync-btn" title="${t('sync')}">${t('sync')}</button>
                     <div class="relative">
                         <button id="hamburgerBtn" class="text-2xl px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">☰</button>
                         <div id="dropdownMenu" class="dropdown-menu">
@@ -1198,6 +1041,12 @@
                     <p><strong>${t('phone')}:</strong> ${driverData.phone || 'Not set'}</p>
                 ` : ''}
                 <p><strong>${t('emergencyContact')}:</strong> ${currentUser?.emergencyContact || 'Not set'}</p>
+                <hr class="my-2 border-gray-300">
+                <p class="font-semibold">${t('ratingSummary')}</p>
+                <div class="flex justify-around text-sm">
+                    <span>${t('driverRating')}: ⭐ ${driverData.averageRating?.toFixed(1) || 'N/A'}</span>
+                    <span>${t('customerRating')}: ⭐ ${(currentUser?.customerRating || 0).toFixed(1) || 'N/A'}</span>
+                </div>
                 <hr class="my-2 border-gray-300">
                 <p class="font-semibold">${t('theme')}</p>
                 <div class="flex flex-wrap justify-center my-2" id="themeDotsContainer">
@@ -1237,7 +1086,7 @@
                     </div>
                 ` : ''}
                 <div class="mt-2 text-xs text-gray-400 text-center">
-                    ${currentRole === 'customer' ? '🚗 '+t('trips')+': ' + allRequests.filter(r => r.customerId === currentUser?.uid).length : ''}
+                    ${currentRole === 'customer' ? '🚗 '+t('completedTrips')+': ' + allRequests.filter(r => r.customerId === currentUser?.uid && r.status === 'delivered').length : ''}
                     ${currentRole === 'driver' ? '🚚 '+t('completedTrips')+': ' + allRequests.filter(r => r.driverId === currentUser?.uid && r.status === 'delivered').length : ''}
                 </div>
             </div>
@@ -1315,7 +1164,6 @@
                     });
                 }
 
-                // Default places
                 const setHomeBtn = container.querySelector('#setHomeBtn');
                 const setWorkBtn = container.querySelector('#setWorkBtn');
                 const clearDefaultsBtn = container.querySelector('#clearDefaultsBtn');
@@ -1344,7 +1192,6 @@
                     });
                 }
 
-                // Referral share
                 const shareBtn = container.querySelector('#shareReferralBtn');
                 if (shareBtn) {
                     shareBtn.addEventListener('click', () => {
@@ -1383,7 +1230,6 @@
             }
         };
 
-        // Header language selector
         document.getElementById('langSelectHeader')?.addEventListener('change', (e) => {
             const lang = e.target.value;
             if (translations[lang]) {
@@ -1395,6 +1241,8 @@
                 renderCustomerTabs();
             }
         });
+
+        document.getElementById('syncBtn')?.addEventListener('click', syncData);
 
         const dropdownMenu = document.getElementById('dropdownMenu');
         const hamburgerBtn = document.getElementById('hamburgerBtn');
@@ -1473,7 +1321,6 @@
                     <div class="flex"><input id="supportChatInput" class="flex-1 text-sm" placeholder="${t('message')}"><button id="supportChatSend" class="bg-primary text-white px-3 rounded ml-1">Send</button></div>
                 </div>
             </div>`;
-        // Submit ticket
         document.getElementById('submitTicketBtn').addEventListener('click', async () => {
             const subject = document.getElementById('ticketSubject').value.trim();
             const message = document.getElementById('ticketMessage').value.trim();
@@ -1490,7 +1337,6 @@
             document.getElementById('ticketSubject').value = '';
             document.getElementById('ticketMessage').value = '';
         });
-        // Live support chat (reuse chat system but with support staff)
         const supportChatRef = collection(db, "supportChat", currentUser.uid, "messages");
         const q = query(supportChatRef, orderBy("timestamp"));
         let unsubSupport = onSnapshot(q, (snap) => {
@@ -1508,10 +1354,7 @@
             await addDoc(supportChatRef, { senderId: currentUser.uid, senderName: currentUser.email, text, timestamp: serverTimestamp() });
             input.value = '';
         });
-        // Cleanup on tab change
-        const cleanup = () => { if (unsubSupport) unsubSupport(); };
-        // We'll call cleanup when tab changes (global)
-        window._supportCleanup = cleanup;
+        window._supportCleanup = () => { if (unsubSupport) unsubSupport(); };
     }
 
     // ============================================================
@@ -1538,7 +1381,6 @@
                 Swal.fire({ title: 'Link copied!', text: 'Share this link with friends.', icon: 'success' });
             });
         });
-        // Load referrals
         const fetchReferrals = async () => {
             const snap = await getDocs(query(collection(db, "users"), where("referredBy", "==", currentUser.uid)));
             const list = document.getElementById('referralList');
@@ -1551,7 +1393,7 @@
     }
 
     // ============================================================
-    // =============== RIDES TAB (HOME) ===========================
+    // =============== RIDES TAB ===================================
     // ============================================================
     function renderRidesTab(container) {
         serviceType = 'taxi';
@@ -1616,7 +1458,6 @@
         container.innerHTML = html;
         document.getElementById('sosBtn').addEventListener('click', triggerSOS);
         attachMapEvents(container);
-        // Add stop functionality
         document.getElementById('addStopBtn').addEventListener('click', () => {
             const container = document.getElementById('stopsContainer');
             const idx = tempStops.length;
@@ -1697,7 +1538,6 @@
                 }
             });
         });
-        // Apply promo button
         document.getElementById('applyPromoBtn')?.addEventListener('click', () => {
             const code = document.getElementById('promoInput')?.value?.toUpperCase()?.trim();
             if (!code) return Swal.fire('Enter a code');
@@ -1770,7 +1610,6 @@
         const internalMap = document.getElementById('cargoMapInternal');
         if (internalMap) internalMap.id = 'customerMap';
 
-        // Add stop for cargo as well
         document.getElementById('addStopBtn').addEventListener('click', () => {
             const container = document.getElementById('stopsContainer');
             const idx = tempStops.length;
@@ -1848,7 +1687,6 @@
             const dims = document.getElementById('cargoDims')?.value || '';
             updatePriceDisplay(vehicle, weight, dims, tempStops.length);
         });
-        // Apply promo
         document.getElementById('applyPromoBtn')?.addEventListener('click', () => {
             const code = document.getElementById('promoInput')?.value?.toUpperCase()?.trim();
             if (!code) return Swal.fire('Enter a code');
@@ -2090,7 +1928,6 @@
                 drawCustomerRoute();
                 activePromo = null;
                 document.getElementById('promoInput').value = '';
-                // Clear stops UI
                 document.getElementById('stopsContainer').innerHTML = '';
             } catch(e) {
                 Swal.fire('Error', e.message, 'error');
@@ -2245,19 +2082,982 @@
     function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
     // ============================================================
-    // =============== FOOD TAB (unchanged, reused) ===============
+    // =============== FOOD TAB ====================================
     // ============================================================
-    // (Full food tab code is identical to previous, omitted for brevity but included in final code)
-    // We'll include it in the final output.
-    // Since the file is long, I'll provide the complete code in the final answer.
-    // For this response, I'll summarize the remaining parts and provide the full file.
+    function renderCustomerFoodTab(container) {
+        if (foodOrdersUnsubscribe) {
+            foodOrdersUnsubscribe();
+            foodOrdersUnsubscribe = null;
+        }
+        Object.values(foodTrackingUnsubs).forEach(unsub => unsub());
+        Object.keys(foodTrackingUnsubs).forEach(key => delete foodTrackingUnsubs[key]);
 
-    // The rest of the functions (food, shops, history, driver tabs, admin) remain unchanged from the previous version,
-    // with all translations applied. They are included in the final code below.
+        let foodOrders = [];
+
+        function renderDriverMapForOrder(orderId, driverId) {
+            const mapContainerId = `foodMap_${orderId}`;
+            const mapContainer = document.getElementById(mapContainerId);
+            if (!mapContainer) return;
+            if (window[`foodMap_${orderId}`]) {
+                window[`foodMap_${orderId}`].remove();
+                delete window[`foodMap_${orderId}`];
+            }
+            if (foodTrackingUnsubs[orderId]) {
+                foodTrackingUnsubs[orderId]();
+                delete foodTrackingUnsubs[orderId];
+            }
+
+            const map = L.map(mapContainerId).setView([-15.3875, 28.3228], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            window[`foodMap_${orderId}`] = map;
+
+            let driverMarker = L.marker([-15.3875, 28.3228], {
+                icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-xl"></i>', iconSize: [24,24] })
+            }).addTo(map).bindTooltip('Driver');
+
+            const unsub = onSnapshot(doc(db, "drivers", driverId), (docSnap) => {
+                if (docSnap.exists()) {
+                    const loc = docSnap.data();
+                    const lat = loc.currentLat || -15.3875;
+                    const lng = loc.currentLng || 28.3228;
+                    driverMarker.setLatLng([lat, lng]);
+                    map.setView([lat, lng], 14);
+                    driverMarker.bindTooltip(`Driver en route`).openTooltip();
+                }
+            });
+            foodTrackingUnsubs[orderId] = unsub;
+        }
+
+        function updateOrderHistory() {
+            const historyContainer = document.getElementById('foodOrderHistory');
+            if (!historyContainer) return;
+            if (foodOrders.length === 0) {
+                historyContainer.innerHTML = '<div class="text-sm opacity-60">No orders yet</div>';
+                return;
+            }
+            historyContainer.innerHTML = foodOrders.map(o => {
+                const statusColors = {
+                    pending: 'text-amber-400 bg-amber-50 dark:bg-amber-900',
+                    accepted: 'text-blue-400 bg-blue-50 dark:bg-blue-900',
+                    delivered: 'text-green-500 bg-green-50 dark:bg-green-900'
+                };
+                const statusLabel = o.status.charAt(0).toUpperCase() + o.status.slice(1);
+                const showMap = o.status === 'accepted' && o.driverId;
+                const trackingLink = o.id ? `${window.location.origin}${window.location.pathname}?track=${o.id}` : '';
+                return `
+                    <div class="border-b border-gray-100 dark:border-gray-700 py-3">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">Order #${o.id.substring(0,6)}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${statusColors[o.status] || 'bg-gray-100'}">${statusLabel}</span>
+                        </div>
+                        <div class="text-xs mt-1">${o.items.map(i => `${i.name} × ${i.qty}`).join(', ')}</div>
+                        <div class="text-xs text-gray-400">${CURRENCY}${o.total} • ${formatDate(o.createdAt)}</div>
+                        ${o.driverName ? `<div class="text-xs text-gray-400">🚚 Driver: ${o.driverName}</div>` : ''}
+                        ${showMap ? `<div id="foodMap_${o.id}" class="map-container mt-2" style="height:150px;"></div>` : ''}
+                        ${trackingLink ? `<div class="mt-1"><span class="tracking-link" onclick="navigator.clipboard.writeText('${trackingLink}').then(()=>Swal.fire({title:'Link copied!',icon:'success',timer:800}))">🔗 Share tracking link</span></div>` : ''}
+                        ${o.status === 'delivered' ? `
+                            <div class="mt-1 flex gap-2 flex-wrap">
+                                <button class="rate-driver text-xs bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded" data-req="${o.id}" data-driver="${o.driverId || ''}">⭐ Rate Driver</button>
+                                <button class="rate-customer text-xs bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded" data-req="${o.id}" data-customer="${o.customerId}">⭐ Rate Customer</button>
+                            </div>
+                        ` : ''}
+                        ${o.status === 'pending' ? `<button class="cancel-order text-xs bg-red-100 dark:bg-red-900 px-2 py-0.5 rounded" data-id="${o.id}">Cancel</button>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            // Cancel order
+            document.querySelectorAll('.cancel-order').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const confirm = await Swal.fire({
+                        title: 'Cancel order?', text: 'Are you sure?', icon: 'warning',
+                        showCancelButton: true, confirmButtonColor: '#ef4444'
+                    });
+                    if (confirm.isConfirmed) {
+                        await deleteDoc(doc(db, "foodOrders", btn.dataset.id));
+                        Swal.fire({ title: 'Canceled', icon: 'info', timer: 1000 });
+                    }
+                });
+            });
+
+            document.querySelectorAll('.rate-driver').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const reqId = btn.dataset.req;
+                    const driverId = btn.dataset.driver;
+                    if (!driverId) return Swal.fire('No driver assigned');
+                    const { value: rating } = await Swal.fire({
+                        title: 'Rate Driver',
+                        input: 'range',
+                        inputLabel: 'Rating (1-5)',
+                        inputAttributes: { min: 1, max: 5, step: 1, value: 5 },
+                        showCancelButton: true
+                    });
+                    if (rating) {
+                        const { value: comment } = await Swal.fire({
+                            title: 'Comment (optional)',
+                            input: 'text',
+                            showCancelButton: true
+                        });
+                        await rateDriver(reqId, driverId, parseInt(rating), comment || '');
+                    }
+                });
+            });
+            document.querySelectorAll('.rate-customer').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const reqId = btn.dataset.req;
+                    const customerId = btn.dataset.customer;
+                    if (!customerId) return Swal.fire('No customer');
+                    const { value: rating } = await Swal.fire({
+                        title: 'Rate Customer',
+                        input: 'range',
+                        inputLabel: 'Rating (1-5)',
+                        inputAttributes: { min: 1, max: 5, step: 1, value: 5 },
+                        showCancelButton: true
+                    });
+                    if (rating) {
+                        const { value: comment } = await Swal.fire({
+                            title: 'Comment (optional)',
+                            input: 'text',
+                            showCancelButton: true
+                        });
+                        await rateCustomer(reqId, customerId, parseInt(rating), comment || '');
+                    }
+                });
+            });
+
+            foodOrders.forEach(o => {
+                if (o.status === 'accepted' && o.driverId) {
+                    setTimeout(() => renderDriverMapForOrder(o.id, o.driverId), 100);
+                }
+            });
+        }
+
+        const loadRestaurants = async () => {
+            const snap = await getDocs(collection(db, "restaurants"));
+            if (!snap.empty) {
+                allRestaurants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } else {
+                const defaultRestaurants = [
+                    { name: "KFC", logo: "🍗", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Zinger Burger", price:35},{name:"Fries", price:15},{name:"Coke", price:8}] },
+                    { name: "Hungry Lion", logo: "🐔", cuisine: "Fast Food", location: "Lusaka", open: true, items: [{name:"Chicken Meal", price:40},{name:"Chips", price:12},{name:"Milkshake", price:18}] },
+                    { name: "Shoprite", logo: "🛒", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Grocery pack", price:50},{name:"Bread", price:7},{name:"Milk", price:12}] },
+                    { name: "Pick n Pay", logo: "🛍️", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Fruit Basket", price:30},{name:"Juice", price:10},{name:"Snacks", price:15}] },
+                    { name: "Game", logo: "🎮", cuisine: "Supermarket", location: "Lusaka", open: true, items: [{name:"Electronics", price:200},{name:"Household", price:45},{name:"Toys", price:25}] }
+                ];
+                for (const r of defaultRestaurants) {
+                    await addDoc(collection(db, "restaurants"), r);
+                }
+                allRestaurants = defaultRestaurants;
+            }
+            renderRestaurantList();
+        };
+
+        const renderRestaurantList = () => {
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-3">🍔 ${t('orderFood')}</h3>
+                <div id="foodContent" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${allRestaurants.map(r => `
+                        <div class="restaurant-card" data-id="${r.id || r.name}">
+                            <div class="flex items-center gap-2">
+                                <span class="text-3xl">${r.logo || '🍽️'}</span>
+                                <div>
+                                    <div class="font-bold">${r.name}</div>
+                                    <div class="text-xs opacity-60">${r.cuisine || ''} • ${r.location || ''}</div>
+                                </div>
+                            </div>
+                            <button class="view-menu-btn mt-2 text-sm bg-primary text-white px-3 py-1 rounded-full">View Menu</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <div id="foodCartPanel" class="mt-4 border-t pt-3">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold">${t('cart')}</span>
+                        <span id="cartCount">0 items</span>
+                    </div>
+                    <div id="cartItems" class="mt-2"></div>
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="foodPromoInput" placeholder="${t('promoCode')}" class="text-sm flex-1">
+                        <button id="foodApplyPromo" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full">${t('apply')}</button>
+                    </div>
+                    <button id="checkoutFoodBtn" class="btn-primary w-full mt-2">${t('checkout')} (${CURRENCY}0.00)</button>
+                </div>
+                <div class="mt-4 border-t pt-3">
+                    <h4 class="font-bold">${t('myOrders')}</h4>
+                    <div id="foodOrderHistory" class="max-h-64 overflow-auto"></div>
+                </div>
+            `;
+
+            let foodPromo = null;
+            document.getElementById('foodApplyPromo')?.addEventListener('click', () => {
+                const code = document.getElementById('foodPromoInput')?.value?.toUpperCase()?.trim();
+                if (!code) return Swal.fire('Enter a code');
+                if (PROMO_CODES[code] !== undefined) {
+                    foodPromo = { code, discount: PROMO_CODES[code] };
+                    Swal.fire({ title: `Promo applied! ${code} – ${PROMO_CODES[code]*100}% off`, icon: 'success', timer: 1500 });
+                    updateCartUI();
+                } else Swal.fire('Invalid code', 'Try SAVE10, SAVE20, or FREE', 'warning');
+            });
+
+            document.querySelectorAll('.view-menu-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const card = e.target.closest('.restaurant-card');
+                    const name = card.querySelector('.font-bold').innerText;
+                    const restaurant = allRestaurants.find(r => r.name === name);
+                    if (!restaurant) return;
+
+                    let menuHtml = restaurant.items.map((item, idx) => `
+                        <div class="menu-item flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span>${item.name}</span>
+                            <div class="flex items-center gap-2">
+                                <span>${CURRENCY}${item.price}</span>
+                                <div class="flex items-center gap-1">
+                                    <button class="qty-minus text-sm bg-gray-200 dark:bg-gray-700 px-2 rounded" data-idx="${idx}">−</button>
+                                    <span class="qty-display w-6 text-center" data-idx="${idx}">1</span>
+                                    <button class="qty-plus text-sm bg-gray-200 dark:bg-gray-700 px-2 rounded" data-idx="${idx}">+</button>
+                                </div>
+                                <button class="add-to-cart-btn bg-primary text-white text-xs px-3 py-1 rounded-full" 
+                                        data-restaurant="${restaurant.name}" 
+                                        data-name="${item.name}" 
+                                        data-price="${item.price}" 
+                                        data-idx="${idx}">Add</button>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    Swal.fire({
+                        title: `${restaurant.logo || '🍽️'} ${restaurant.name}`,
+                        html: `<div class="text-left max-h-80 overflow-auto">${menuHtml}</div>`,
+                        confirmButtonText: 'Close',
+                        didOpen: () => {
+                            document.querySelectorAll('.qty-minus, .qty-plus').forEach(b => {
+                                b.addEventListener('click', () => {
+                                    const idx = parseInt(b.dataset.idx);
+                                    const display = document.querySelector(`.qty-display[data-idx="${idx}"]`);
+                                    let val = parseInt(display.textContent);
+                                    if (b.classList.contains('qty-minus')) val = Math.max(1, val - 1);
+                                    else val = Math.min(99, val + 1);
+                                    display.textContent = val;
+                                });
+                            });
+
+                            document.querySelectorAll('.add-to-cart-btn').forEach(b => {
+                                b.addEventListener('click', () => {
+                                    const rname = b.dataset.restaurant;
+                                    const iname = b.dataset.name;
+                                    const iprice = parseFloat(b.dataset.price);
+                                    const idx = parseInt(b.dataset.idx);
+                                    const qtyDisplay = document.querySelector(`.qty-display[data-idx="${idx}"]`);
+                                    const qty = parseInt(qtyDisplay.textContent);
+
+                                    const existing = foodCart.find(x => x.restaurant === rname && x.name === iname);
+                                    if (existing) existing.qty += qty;
+                                    else foodCart.push({ restaurant: rname, name: iname, price: iprice, qty });
+
+                                    updateCartUI();
+                                    Swal.fire({ title: `Added ${qty} × ${iname}`, icon: 'success', timer: 800, showConfirmButton: false });
+                                });
+                            });
+                        }
+                    });
+                });
+            });
+
+            const updateCartUI = () => {
+                const countSpan = document.getElementById('cartCount');
+                const itemsDiv = document.getElementById('cartItems');
+                const checkoutBtn = document.getElementById('checkoutFoodBtn');
+
+                if (countSpan) countSpan.innerText = foodCart.reduce((s, i) => s + i.qty, 0) + ' items';
+
+                if (itemsDiv) {
+                    if (foodCart.length === 0) {
+                        itemsDiv.innerHTML = '<div class="text-sm opacity-60">' + t('cartEmpty') + '</div>';
+                    } else {
+                        itemsDiv.innerHTML = foodCart.map((i, idx) => `
+                            <div class="cart-item flex justify-between items-center py-1 border-b border-gray-100 dark:border-gray-700">
+                                <span>${i.name} × ${i.qty}</span>
+                                <span class="flex items-center gap-2">
+                                    ${CURRENCY}${(i.price * i.qty).toFixed(2)}
+                                    <button class="remove-cart-item text-red-500 text-xs" data-index="${idx}">✕</button>
+                                </span>
+                            </div>
+                        `).join('');
+
+                        document.querySelectorAll('.remove-cart-item').forEach(b => {
+                            b.addEventListener('click', () => {
+                                const idx = parseInt(b.dataset.index);
+                                foodCart.splice(idx, 1);
+                                updateCartUI();
+                            });
+                        });
+                    }
+                }
+
+                if (checkoutBtn) {
+                    let total = foodCart.reduce((s, i) => s + i.price * i.qty, 0);
+                    if (foodPromo) total = total * (1 - foodPromo.discount);
+                    checkoutBtn.innerText = `${t('checkout')} (${CURRENCY}${total.toFixed(2)})${foodPromo ? ' ✨' : ''}`;
+                }
+            };
+
+            document.getElementById('checkoutFoodBtn').addEventListener('click', async () => {
+                if (foodCart.length === 0) return Swal.fire(t('cartEmpty'), t('addItems'), 'info');
+
+                let deliveryAddr = tempPickupAddress || '';
+                if (!deliveryAddr) {
+                    const { value: addr } = await Swal.fire({
+                        title: t('deliveryAddress'),
+                        input: 'text',
+                        inputLabel: t('whereDeliver'),
+                        inputPlaceholder: 'e.g. 123 Main St, Lusaka',
+                        showCancelButton: true
+                    });
+                    if (!addr) return;
+                    deliveryAddr = addr;
+                }
+
+                let total = foodCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                if (foodPromo) total = total * (1 - foodPromo.discount);
+
+                try {
+                    Swal.fire({ title: t('placingOrder'), timer: 1500, didOpen: () => Swal.showLoading() });
+
+                    const order = {
+                        customerId: currentUser.uid,
+                        customerName: currentUser.email,
+                        items: foodCart.map(i => ({ name: i.name, price: i.price, qty: i.qty })),
+                        total: Math.round(total * 100) / 100,
+                        deliveryAddress: deliveryAddr,
+                        status: 'pending',
+                        driverId: null,
+                        driverName: null,
+                        createdAt: serverTimestamp(),
+                        promoCode: foodPromo?.code || null
+                    };
+                    await addDoc(collection(db, "foodOrders"), order);
+
+                    foodCart = [];
+                    foodPromo = null;
+                    document.getElementById('foodPromoInput').value = '';
+                    updateCartUI();
+
+                    Swal.fire({ title: t('orderPlaced'), icon: 'success', timer: 2000, showConfirmButton: false });
+                    showNotification(t('orderPlaced'), t('orderPreparing'));
+                } catch (e) {
+                    Swal.fire('Error', e.message, 'error');
+                }
+            });
+
+            const q = query(
+                collection(db, "foodOrders"),
+                where("customerId", "==", currentUser.uid),
+                orderBy("createdAt", "desc")
+            );
+            foodOrdersUnsubscribe = onSnapshot(q, (snap) => {
+                foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateOrderHistory();
+            });
+
+            updateCartUI();
+        };
+
+        loadRestaurants();
+    }
 
     // ============================================================
-    // =============== BOOT ========================================
+    // =============== SHOPS TAB ===================================
     // ============================================================
+    function renderCustomerShopsTab(container) {
+        const loadShops = async () => {
+            const snap = await getDocs(collection(db, "restaurants"));
+            let shops = [];
+            if (!snap.empty) {
+                shops = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.cuisine && r.cuisine.toLowerCase().includes('supermarket'));
+            } else {
+                shops = [
+                    { name: "Shoprite", logo: "🛒", cuisine: "Supermarket", location: "Lusaka", open: true },
+                    { name: "Pick n Pay", logo: "🛍️", cuisine: "Supermarket", location: "Lusaka", open: true },
+                    { name: "Game", logo: "🎮", cuisine: "Supermarket", location: "Lusaka", open: true }
+                ];
+                for (const r of shops) await addDoc(collection(db, "restaurants"), r);
+            }
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-3">🛒 ${t('shops')}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${shops.map(r => `
+                        <div class="restaurant-card">
+                            <div class="flex items-center gap-2"><span class="text-2xl">${r.logo || '🏪'}</span><div><div class="font-bold">${r.name}</div><div class="text-xs opacity-60">${r.cuisine} • ${r.location}</div></div></div>
+                            <div class="text-xs mt-1">Open: ${r.open ? '✅ Open' : '❌ Closed'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        };
+        loadShops();
+    }
+
+    // ============================================================
+    // =============== HISTORY TAB =================================
+    // ============================================================
+    function renderCustomerHistoryTab(container) {
+        const rideHistory = allRequests.filter(r => r.customerId === currentUser.uid && r.status === 'delivered');
+        const getFoodOrders = async () => {
+            const snap = await getDocs(query(collection(db,"foodOrders"), where("customerId","==",currentUser.uid), orderBy("createdAt","desc")));
+            const foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            let html = '';
+            if (rideHistory.length === 0 && foodOrders.length === 0) {
+                html = `<div class="text-center py-8 text-gray-400">${t('noTrips')}</div>`;
+            } else {
+                if (rideHistory.length) {
+                    html += `<h4 class="font-semibold mt-2">🚗 ${t('completedTrips')}</h4>`;
+                    html += rideHistory.map(r => {
+                        const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+                        return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between items-center"><div><span class="font-medium">${tripDisplay}</span> ${r.type} – ${CURRENCY}${r.price}<br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>${r.vehicleType ? ` • ${r.vehicleType}` : ''}${r.promoCode ? ` ✨${r.promoCode}` : ''}</div><button class="view-trip text-sm" style="color:var(--primary);" data-id="${r.id}">${t('viewRoute')}</button></div>`;
+                    }).join('');
+                }
+                if (foodOrders.length) {
+                    html += `<h4 class="font-semibold mt-2">🍔 ${t('food')}</h4>`;
+                    html += foodOrders.map(o => `<div class="border-b border-gray-100 dark:border-gray-700 py-2"><span class="font-medium">Order #${o.id.substring(0,6)}</span> – ${CURRENCY}${o.total}<br><span class="text-xs text-gray-400">📅 ${formatDate(o.createdAt)}</span>${o.promoCode ? ` ✨${o.promoCode}` : ''}</div>`).join('');
+                }
+            }
+            container.innerHTML = html;
+            document.querySelectorAll('.view-trip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const trip = allRequests.find(r => r.id === btn.dataset.id);
+                    if(trip && trip.pickupLatLng && trip.dropoffLatLng){
+                        Swal.fire({title:'Trip route', html:`<div id="miniMap" style="height:200px;"></div>`, didOpen:()=>{setTimeout(()=>{const map=L.map('miniMap').setView([trip.pickupLatLng.lat,trip.pickupLatLng.lng],12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([trip.pickupLatLng.lat,trip.pickupLatLng.lng]).addTo(map).bindTooltip('Pickup'); L.marker([trip.dropoffLatLng.lat,trip.dropoffLatLng.lng]).addTo(map).bindTooltip('Dropoff'); L.Routing.control({waypoints:[L.latLng(trip.pickupLatLng.lat,trip.pickupLatLng.lng),L.latLng(trip.dropoffLatLng.lat,trip.dropoffLatLng.lng)],routeWhileDragging:false,showAlternatives:false,lineOptions:{styles:[{color:'var(--primary)',weight:4}]},createMarker:function(){return null;}}).addTo(map);},100);}});
+                    }
+                });
+            });
+        };
+        getFoodOrders();
+    }
+
+    // ============================================================
+    // =============== DRIVER DASHBOARD ===========================
+    // ============================================================
+    function renderDriverTabs() {
+        const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+        const total = completed.reduce((s,r) => s + r.price, 0);
+        const today = new Date().toDateString();
+        const todayEarn = completed.filter(r => r.createdAt?.toDate?.()?.toDateString() === today).reduce((s,r) => s + r.price, 0);
+        document.getElementById('appContainer').innerHTML = `
+            <div class="fade-in">
+                ${renderHeader(`🚚 Driver`, 'logoutDriver')}
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <div class="bg-primary-light p-2 rounded-xl text-center" style="background:var(--primary-bg);"><span class="text-xs">${t('today')}</span><div class="font-bold">${CURRENCY}${todayEarn}</div></div>
+                    <div class="bg-blue-50 dark:bg-blue-900 p-2 rounded-xl text-center"><span class="text-xs">${t('week')}</span><div class="font-bold">${CURRENCY}${completed.filter(r => r.createdAt?.toDate?.() > new Date(Date.now()-7*86400000)).reduce((s,r)=>s+r.price,0)}</div></div>
+                    <div class="bg-amber-50 dark:bg-amber-900 p-2 rounded-xl text-center"><span class="text-xs">${t('total')}</span><div class="font-bold">${CURRENCY}${total}</div></div>
+                </div>
+                <div class="flex items-center gap-2 text-sm mb-3"><span>⭐ Rating: ${driverData.averageRating?.toFixed(1) || 'N/A'}</span><span class="bg-green-100 dark:bg-green-900 px-3 py-0.5 rounded-full">${driverData.status}</span></div>
+                <div class="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='map'?'tab-active':''}" data-tab="map">🗺️ ${t('home')}</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='requests'?'tab-active':''}" data-tab="requests">📋 ${t('available')} <span id="newOrderBadge" class="new-order-badge hidden">0</span></button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='active'?'tab-active':''}" data-tab="active">🚦 ${t('active')}</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='earnings'?'tab-active':''}" data-tab="earnings">📊 ${t('earnings')}</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='history'?'tab-active':''}" data-tab="history">📜 ${t('history')}</button>
+                    <button class="tab-btn pb-2 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap ${activeTab==='support'?'tab-active':''}" data-tab="support">💬 ${t('support')}</button>
+                </div>
+                <div id="tabContent" class="card p-4 md:p-5 rounded-2xl shadow">Loading...</div>
+            </div>`;
+        document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
+            activeTab=btn.dataset.tab;
+            if (activeTab === 'requests') resetNewOrderBadge();
+            renderDriverTabs();
+        }));
+        document.getElementById('logoutDriver').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
+        document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
+        document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderDriverTabs();};
+        document.getElementById('langSelectHeader')?.addEventListener('change', (e) => {
+            const lang = e.target.value;
+            if (translations[lang]) {
+                currentLang = lang;
+                localStorage.setItem('lang', lang);
+                if (currentUser) {
+                    setDoc(doc(db, "userPreferences", currentUser.uid), { language: lang }, { merge: true });
+                }
+                renderDriverTabs();
+            }
+        });
+        document.getElementById('syncBtn')?.addEventListener('click', syncData);
+        document.getElementById('driverModeToggle').onclick = async () => {
+            await updateDoc(doc(db, "users", currentUser.uid), { role: 'customer' });
+            currentRole = 'customer';
+            Swal.fire({ title: 'Switched to Passenger mode', icon: 'info', timer: 1500, showConfirmButton: false });
+            renderCustomerTabs();
+        };
+
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        hamburgerBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownMenu?.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (dropdownMenu && hamburgerBtn && 
+                !dropdownMenu.contains(e.target) && 
+                !hamburgerBtn.contains(e.target)) {
+                dropdownMenu.classList.remove('open');
+            }
+        });
+        dropdownMenu?.querySelectorAll('[data-tab]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const tab = item.dataset.tab;
+                if (tab === 'profile') {
+                    showProfileModal();
+                    dropdownMenu.classList.remove('open');
+                    return;
+                }
+                dropdownMenu.classList.remove('open');
+                activeTab = tab;
+                renderDriverTabs();
+            });
+        });
+
+        const content=document.getElementById('tabContent');
+        if(activeTab==='map') renderDriverMapTab(content);
+        else if(activeTab==='requests') renderDriverAvailableTab(content);
+        else if(activeTab==='active') renderDriverActiveTab(content);
+        else if(activeTab==='earnings') renderDriverEarningsTab(content);
+        else if(activeTab==='history') renderDriverHistoryTab(content);
+        else if(activeTab==='support') renderSupportTab(content);
+        updateNewOrderBadge();
+    }
+
+    // =============== DRIVER EARNINGS TAB ========================
+    function renderDriverEarningsTab(container) {
+        const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
+        const total = completed.reduce((s,r) => s + r.price, 0);
+        const avg = completed.length ? total / completed.length : 0;
+        const today = new Date().toDateString();
+        const todayEarn = completed.filter(r => r.createdAt?.toDate?.()?.toDateString() === today).reduce((s,r) => s + r.price, 0);
+        const weekEarn = completed.filter(r => r.createdAt?.toDate?.() > new Date(Date.now()-7*86400000)).reduce((s,r) => s + r.price, 0);
+        
+        const dayLabels = [];
+        const dayData = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const ds = d.toDateString();
+            dayLabels.push(d.toLocaleDateString('en-ZM', { weekday: 'short' }));
+            const earn = completed.filter(r => r.createdAt?.toDate?.()?.toDateString() === ds).reduce((s,r) => s + r.price, 0);
+            dayData.push(earn);
+        }
+
+        container.innerHTML = `
+            <div class="space-y-4">
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="card p-3 text-center"><span class="text-xs text-gray-400">${t('today')}</span><div class="font-bold text-lg">${CURRENCY}${todayEarn.toFixed(2)}</div></div>
+                    <div class="card p-3 text-center"><span class="text-xs text-gray-400">${t('week')}</span><div class="font-bold text-lg">${CURRENCY}${weekEarn.toFixed(2)}</div></div>
+                    <div class="card p-3 text-center"><span class="text-xs text-gray-400">${t('total')}</span><div class="font-bold text-lg">${CURRENCY}${total.toFixed(2)}</div></div>
+                </div>
+                <div class="card p-3">
+                    <div class="flex justify-between text-sm"><span>${t('avgPerTrip')}</span><span>${CURRENCY}${avg.toFixed(2)}</span></div>
+                    <div class="flex justify-between text-sm"><span>${t('completedTrips')}</span><span>${completed.length}</span></div>
+                </div>
+                <div class="card p-3">
+                    <h4 class="font-semibold text-sm mb-2">${t('last7Days')}</h4>
+                    <canvas id="earningsChart" height="150"></canvas>
+                </div>
+            </div>
+        `;
+        setTimeout(() => {
+            const ctx = document.getElementById('earningsChart')?.getContext('2d');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: dayLabels, datasets: [{ label: 'Earnings', data: dayData, backgroundColor: 'var(--primary)', borderRadius: 4 }] },
+                    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+                });
+            }
+        }, 100);
+    }
+
+    // =============== DRIVER MAP TAB =============================
+    function renderDriverMapTab(container) {
+        container.innerHTML = `<div id="driverMap" class="map-container"></div><div class="flex gap-2 mt-2 flex-wrap"><button id="gpsBtn" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">📍 GPS</button><button id="centerDriverMap" class="text-sm bg-gray-100 dark:bg-gray-700 px-4 py-1 rounded-full">🎯 Center</button><button id="sosBtnDriver" class="sos-btn text-sm px-4 py-1 rounded-full bg-red-500 text-white" style="border-radius:2rem; width:auto; height:auto; padding:0.4rem 1rem;">🆘 SOS</button></div>`;
+        initDriverMap();
+        document.getElementById('gpsBtn').onclick = () => { if(navigator.geolocation){Swal.fire({title:'Getting location...',timer:2000,didOpen:()=>Swal.showLoading()}); navigator.geolocation.getCurrentPosition(pos=>{updateDriverLoc(pos.coords.latitude,pos.coords.longitude); Swal.close();});}};
+        document.getElementById('centerDriverMap').onclick = () => driverMap.setView([driverData.currentLat,driverData.currentLng],14);
+        document.getElementById('sosBtnDriver').addEventListener('click', triggerSOS);
+    }
+
+    function initDriverMap() {
+        if(driverMap){driverMap.remove(); driverMap=null;}
+        driverMap = L.map('driverMap').setView([driverData.currentLat,driverData.currentLng],13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(driverMap);
+        driverMarker = L.marker([driverData.currentLat,driverData.currentLng], { icon: L.divIcon({ html: '<i class="fas fa-motorcycle text-amber-600 text-2xl"></i>', iconSize: [24,24] }) }).addTo(driverMap).bindTooltip('You');
+        window.driverMap = driverMap;
+        const activeId = driverData.activeRequestId;
+        if(activeId){
+            const trip = allRequests.find(r => r.id === activeId);
+            if(trip && trip.pickupLatLng && trip.dropoffLatLng){
+                L.marker([trip.pickupLatLng.lat,trip.pickupLatLng.lng]).addTo(driverMap).bindTooltip('Pickup');
+                L.marker([trip.dropoffLatLng.lat,trip.dropoffLatLng.lng]).addTo(driverMap).bindTooltip('Dropoff');
+                L.Routing.control({
+                    waypoints: [L.latLng(driverData.currentLat,driverData.currentLng), L.latLng(trip.dropoffLatLng.lat,trip.dropoffLatLng.lng)],
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    lineOptions: {styles: [{color: 'var(--primary)', weight: 4}]},
+                    createMarker: function() { return null; }
+                }).addTo(driverMap);
+            }
+        }
+    }
+
+    async function updateDriverLoc(lat,lng) {
+        driverData.currentLat=lat; driverData.currentLng=lng;
+        await updateDoc(doc(db,"drivers",currentUser.uid),{currentLat:lat,currentLng:lng});
+        if(driverMarker) driverMarker.setLatLng([lat,lng]);
+        if(driverMap) driverMap.setView([lat,lng],13);
+        renderDriverTabs();
+    }
+
+    // =============== DRIVER AVAILABLE TAB =====================
+    function renderDriverAvailableTab(container) {
+        const getFoodOrders = async () => {
+            const snap = await getDocs(query(collection(db,"foodOrders"), where("status","==","pending")));
+            const foodOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const pendingRides = allRequests.filter(r => r.status === 'pending');
+            let combined = [...pendingRides.map(r => ({ ...r, displayType: r.type === 'taxi' ? '🚖 Taxi' : '📦 Delivery', isFood: false }))];
+            combined = [...combined, ...foodOrders.map(o => ({ id: o.id, customerName: o.customerName, displayType: '🍔 Food Order', cargoDetail: o.items.map(i=>`${i.name}×${i.qty}`).join(', '), price: o.total, status: 'pending', isFood: true, createdAt: o.createdAt }))];
+            if (combined.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400">No available requests</div>';
+            } else {
+                container.innerHTML = combined.map(req => {
+                    const tripDisplay = req.tripNumber ? `#${req.tripNumber}` : `#${req.id.substring(0,6)}`;
+                    return `<div class="border-b border-gray-100 dark:border-gray-700 py-3 flex justify-between items-center">
+                        <div><span class="font-medium">${tripDisplay} ${req.displayType}</span> – ${req.cargoDetail}<br><span class="text-xs text-gray-400">${req.customerName} • ${CURRENCY}${req.price}</span></div>
+                        <button class="acceptReq bg-primary text-white px-4 py-1 rounded-full text-sm" data-id="${req.id}" data-food="${req.isFood||false}">Accept</button>
+                    </div>`;
+                }).join('');
+                document.querySelectorAll('.acceptReq').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        const isFood = btn.dataset.food === 'true';
+                        if (isFood) {
+                            await updateDoc(doc(db,"foodOrders", id), { status: 'accepted', driverId: currentUser.uid, driverName: currentUser.email });
+                            const order = allRequests.find(r => r.id === id);
+                            if (order?.customerId) {
+                                await sendNotificationToUser(order.customerId, '🍔 Food accepted!', `${currentUser.email} is preparing your order.`);
+                            }
+                            showNotification('Food order accepted', 'You will deliver this order.');
+                            renderDriverTabs();
+                        } else {
+                            const req = allRequests.find(r => r.id === id);
+                            if (req && req.status === 'pending' && driverData.status !== 'busy') {
+                                const driverSnap = await getDoc(doc(db,"drivers",currentUser.uid));
+                                const drv = driverSnap.data() || {};
+                                await updateDoc(doc(db,"requests", req.id), {
+                                    status: 'accepted',
+                                    driverId: currentUser.uid,
+                                    driverName: currentUser.email,
+                                    driverCar: drv.carModel || '',
+                                    driverPlate: drv.plate || ''
+                                });
+                                await updateDoc(doc(db,"drivers",currentUser.uid), { activeRequestId: req.id, status: "busy" });
+                                driverData.activeRequestId = req.id; driverData.status = "busy";
+                                if (req.customerId) {
+                                    await sendNotificationToUser(req.customerId, '🚖 Driver accepted!', `${currentUser.email} is on the way to pick you up.`);
+                                }
+                                renderDriverTabs();
+                                showNotification('Accepted', `You took ${req.type} from ${req.customerName}`);
+                            } else Swal.fire('Cannot accept', 'Busy or taken', 'warning');
+                        }
+                    });
+                });
+            }
+        };
+        getFoodOrders();
+        resetNewOrderBadge();
+    }
+
+    // =============== DRIVER ACTIVE TAB =========================
+    function renderDriverActiveTab(container) {
+        const activeId = driverData.activeRequestId;
+        if (!activeId) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No active trip</div>'; return; }
+        const trip = allRequests.find(r => r.id === activeId);
+        if (!trip) { container.innerHTML = '<div class="text-center py-8 text-gray-400">Loading...</div>'; return; }
+        const distToDropoff = trip.dropoffLatLng ? haversine(driverData.currentLat,driverData.currentLng,trip.dropoffLatLng.lat,trip.dropoffLatLng.lng) : 0;
+        const tripDisplay = trip.tripNumber ? `#${trip.tripNumber}` : `#${trip.id.substring(0,6)}`;
+        let progressHtml = '';
+        if (trip.status === 'accepted') progressHtml = `<div class="progress-step flex items-center gap-2"><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Accepted <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-primary"></span> Go to pickup <span class="flex-1 h-0.5 bg-gray-300"></span><span class="dot w-3 h-3 rounded-full bg-gray-300"></span> Deliver</div>`;
+        else if (trip.status === 'pickedUp') progressHtml = `<div class="progress-step flex items-center gap-2"><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Accepted <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-green-500"></span> Picked up <span class="flex-1 h-0.5 bg-green-500"></span><span class="dot w-3 h-3 rounded-full bg-primary"></span> Delivering</div>`;
+        let chatHtml = `<div class="mt-2"><details id="chatDetails"><summary id="chatSummary">💬 Chat with customer <span id="chatBadge" class="chat-badge hidden">0</span></summary><div id="chatMessages" class="h-32 overflow-auto border rounded p-2 mb-2"></div><div class="flex"><input id="chatInput" class="flex-1 text-sm"><button id="sendChat" class="bg-primary text-white px-3 rounded ml-1">Send</button></div></details></div>`;
+        container.innerHTML = `
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold">${tripDisplay}</span>
+                    <span class="text-sm bg-primary-light text-primary px-3 py-1 rounded-full" style="background:var(--primary-bg); color:var(--primary);">${trip.status}</span>
+                    <button id="sosBtnActive" class="sos-btn text-sm px-3 py-1 rounded-full bg-red-500 text-white" style="border-radius:2rem; width:auto; height:auto; padding:0.3rem 0.8rem;">🆘</button>
+                </div>
+                ${progressHtml}
+                <div><span class="text-gray-500">Customer:</span> ${trip.customerName}</div>
+                <div><span class="text-gray-500">Details:</span> ${trip.cargoDetail}</div>
+                <div><span class="text-gray-500">Price:</span> ${CURRENCY}${trip.price}</div>
+                <div><span class="text-gray-500">Vehicle:</span> ${trip.vehicleType || 'Car'}</div>
+                ${trip.weight ? `<div><span class="text-gray-500">Weight:</span> ${trip.weight} kg</div>` : ''}
+                ${trip.promoCode ? `<div><span class="text-gray-500">Promo:</span> ${trip.promoCode}</div>` : ''}
+                <div><span class="text-gray-500">Distance to dropoff:</span> ${distToDropoff.toFixed(2)} km (${estimateTime(distToDropoff)})</div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="moveToPickup" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📍 Move to pickup</button>
+                    <button id="moveToDropoff" class="bg-blue-100 dark:bg-blue-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>🏁 Move to dropoff</button>
+                    <button id="markPicked" class="bg-amber-100 dark:bg-amber-900 px-4 py-1 rounded-full text-sm" ${trip.status==='accepted'?'':'disabled'}>📦 Picked up</button>
+                    <button id="markDelivered" class="bg-emerald-100 dark:bg-emerald-900 px-4 py-1 rounded-full text-sm" ${trip.status==='pickedUp'?'':'disabled'}>✅ Delivered</button>
+                    <button id="cancelRideBtn" class="bg-red-100 dark:bg-red-900 px-4 py-1 rounded-full text-sm">${t('cancel')}</button>
+                </div>
+                ${chatHtml}
+            </div>`;
+        document.getElementById('sosBtnActive').addEventListener('click', triggerSOS);
+        document.getElementById('moveToPickup').onclick = async () => { if (trip.pickupLatLng) await updateDriverLoc(trip.pickupLatLng.lat, trip.pickupLatLng.lng); };
+        document.getElementById('moveToDropoff').onclick = async () => { if (trip.dropoffLatLng) await updateDriverLoc(trip.dropoffLatLng.lat, trip.dropoffLatLng.lng); };
+        document.getElementById('markPicked').onclick = async () => {
+            if (trip.status === 'accepted') {
+                await updateDoc(doc(db,"requests",trip.id),{status:'pickedUp'});
+                if (trip.customerId) {
+                    await sendNotificationToUser(trip.customerId, '🚖 Picked up!', `You're on your way to ${trip.dropoffAddress}`);
+                }
+                renderDriverTabs();
+                showNotification('Picked up', `You picked up ${trip.customerName}`);
+            }
+        };
+        document.getElementById('markDelivered').onclick = async () => {
+            if (trip.status === 'pickedUp') {
+                await updateDoc(doc(db,"requests",trip.id),{status:'delivered'});
+                await updateDoc(doc(db,"drivers",currentUser.uid),{activeRequestId:null,status:"online"});
+                driverData.activeRequestId=null; driverData.status="online";
+                if (trip.customerId) {
+                    await sendNotificationToUser(trip.customerId, '✅ Trip completed!', `You've arrived at ${trip.dropoffAddress}. Thank you!`);
+                }
+                renderDriverTabs();
+                showNotification('Delivered', `Trip completed with ${trip.customerName}`);
+                setTimeout(() => {
+                    Swal.fire({
+                        title: '⭐ Rate Customer',
+                        text: 'How was this customer?',
+                        input: 'range',
+                        inputLabel: 'Rating (1-5)',
+                        inputAttributes: { min: 1, max: 5, step: 1, value: 5 },
+                        showCancelButton: true,
+                        confirmButtonText: 'Submit'
+                    }).then(async (result) => {
+                        if (result.isConfirmed && result.value) {
+                            await rateCustomer(trip.id, trip.customerId, parseInt(result.value), '');
+                        }
+                    });
+                }, 1000);
+            }
+        };
+        document.getElementById('cancelRideBtn').addEventListener('click', async () => {
+            const confirm = await Swal.fire({
+                title: t('cancelRide'),
+                text: t('confirmCancel'),
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444'
+            });
+            if (confirm.isConfirmed) {
+                await updateDoc(doc(db,"requests",trip.id),{status:'canceled'});
+                await updateDoc(doc(db,"drivers",currentUser.uid),{activeRequestId:null,status:"online"});
+                driverData.activeRequestId=null; driverData.status="online";
+                if (trip.customerId) {
+                    await sendNotificationToUser(trip.customerId, '❌ Ride canceled', `The driver canceled your trip.`);
+                }
+                renderDriverTabs();
+                Swal.fire({ title: t('tripCanceled'), icon: 'info', timer: 1500 });
+            }
+        });
+        if (trip.id) loadChat(trip.id, true);
+    }
+
+    // =============== DRIVER HISTORY TAB ========================
+    function renderDriverHistoryTab(container) {
+        const my = allRequests.filter(r => r.driverId === currentUser.uid && (r.status === 'delivered' || r.status === 'canceled'));
+        if (!my.length) { container.innerHTML = '<div class="text-center py-8 text-gray-400">No completed trips</div>'; return; }
+        container.innerHTML = my.map(r => {
+            const tripDisplay = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+            return `<div class="border-b border-gray-100 dark:border-gray-700 py-2 flex justify-between">
+                <div><span>${tripDisplay} ${r.type} – ${CURRENCY}${r.price}</span><br><span class="text-xs text-gray-400">📅 ${formatDate(r.createdAt)}</span>${r.vehicleType ? ` • ${r.vehicleType}` : ''}${r.status === 'canceled' ? ' ❌' : ''}</div>
+                <span class="text-sm text-gray-400">${r.customerName}</span>
+            </div>`;
+        }).join('');
+    }
+
+    // ---------- CHAT ----------
+    async function loadChat(requestId, showBadge = false) {
+        if (chatUnsub) chatUnsub();
+        const chatRef = collection(db, "chats", requestId, "messages");
+        const q = query(chatRef, orderBy("timestamp"));
+        const userId = currentUser.uid;
+        let lastRead = null;
+        try {
+            const readDoc = await getDoc(doc(db, "chatReads", requestId));
+            if (readDoc.exists() && readDoc.data()[userId]) {
+                lastRead = readDoc.data()[userId].toDate ? readDoc.data()[userId].toDate() : new Date(readDoc.data()[userId]);
+            }
+        } catch(e) {}
+        chatUnsub = onSnapshot(q, (snap) => {
+            const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const chatDiv = document.getElementById('chatMessages');
+            if (chatDiv) {
+                chatDiv.innerHTML = messages.map(m => `<div class="chat-message"><b>${m.senderName}:</b> ${m.text} <span class="time">${formatTime(m.timestamp)}</span></div>`).join('');
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }
+            if (showBadge && lastRead !== null) {
+                const unread = messages.filter(m => {
+                    const ts = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+                    return ts > lastRead && m.senderId !== userId;
+                });
+                const badge = document.getElementById('chatBadge');
+                if (badge) {
+                    if (unread.length > 0) { badge.innerText = unread.length; badge.classList.remove('hidden'); }
+                    else { badge.classList.add('hidden'); }
+                }
+            } else {
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            }
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg && lastMsg.senderId !== userId && showBadge) {
+                showNotification('New message', `${lastMsg.senderName}: ${lastMsg.text}`);
+            }
+        });
+        const details = document.getElementById('chatDetails');
+        if (details) {
+            details.addEventListener('toggle', async () => {
+                if (details.open) {
+                    await setDoc(doc(db, "chatReads", requestId), { [userId]: serverTimestamp() }, { merge: true });
+                    const badge = document.getElementById('chatBadge');
+                    if (badge) badge.classList.add('hidden');
+                }
+            });
+        }
+        const sendBtn = document.getElementById('sendChat');
+        const input = document.getElementById('chatInput');
+        if (sendBtn && input) {
+            const newSend = async () => {
+                const text = input.value.trim();
+                if (!text) return;
+                await addDoc(collection(db, "chats", requestId, "messages"), { senderId: userId, senderName: currentUser.email, text, timestamp: serverTimestamp() });
+                input.value = '';
+                await setDoc(doc(db, "chatReads", requestId), { [userId]: serverTimestamp() }, { merge: true });
+                const badge = document.getElementById('chatBadge');
+                if (badge) badge.classList.add('hidden');
+            };
+            sendBtn.onclick = newSend;
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') newSend(); });
+        }
+    }
+
+    // ============================================================
+    // =============== ADMIN PANEL =================================
+    // ============================================================
+    async function renderAdminPanel() {
+        const usersSnap=await getDocs(collection(db,"users"));
+        const driversSnap=await getDocs(collection(db,"drivers"));
+        const requestsSnap=await getDocs(collection(db,"requests"));
+        const foodOrdersSnap=await getDocs(collection(db,"foodOrders"));
+        
+        const byDay={}; 
+        let totalRevenue = 0;
+        allRequests.forEach(r=>{
+            if (r.status === 'delivered') {
+                const d=r.createdAt?.toDate?.()?.toDateString()||'Unknown'; 
+                byDay[d]=(byDay[d]||0)+r.price;
+                totalRevenue += r.price;
+            }
+        });
+        const topDrivers=[]; 
+        for(const d of driversSnap.docs){
+            const user=await getDoc(doc(db,"users",d.id)); 
+            const email=user.exists()?user.data().email:d.id; 
+            const data=d.data(); 
+            const driverReqs = allRequests.filter(r => r.driverId === d.id && r.status === 'delivered');
+            const earnings = driverReqs.reduce((s,r) => s + r.price, 0);
+            topDrivers.push({email, rating:data.averageRating||0, count:data.ratingsCount||0, car:data.carModel||'', plate:data.plate||'', earnings });
+        } 
+        topDrivers.sort((a,b)=>b.earnings-a.earnings);
+
+        document.getElementById('appContainer').innerHTML=`
+            <div class="fade-in">
+                ${renderHeader('👑 Admin', 'adminLogout')}
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="card text-center p-3">👥 Users<br><span class="text-2xl font-bold">${usersSnap.size}</span></div>
+                    <div class="card text-center p-3">🚚 Drivers<br><span class="text-2xl font-bold">${driversSnap.size}</span></div>
+                    <div class="card text-center p-3">📦 Rides<br><span class="text-2xl font-bold">${requestsSnap.size}</span></div>
+                    <div class="card text-center p-3">💰 Revenue<br><span class="text-2xl font-bold">${CURRENCY}${totalRevenue.toFixed(2)}</span></div>
+                </div>
+                <div class="card p-4 mb-4"><h3 class="font-semibold">${t('revenuePerDay')}</h3><canvas id="revenueChart" height="150"></canvas></div>
+                <div class="card p-4 mb-4"><h3 class="font-semibold">${t('topDrivers')}</h3><ul>${topDrivers.slice(0,5).map(d=>`<li>${d.email} – ${CURRENCY}${d.earnings.toFixed(2)} ⭐ ${d.rating.toFixed(1)} (${d.count}) – ${d.car} (${d.plate})</li>`).join('')}</ul></div>
+                <div class="card p-4 mb-4">
+                    <h3 class="font-semibold">📋 Requests</h3>
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="all">All</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="pending">Pending</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="accepted">Accepted</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="delivered">Delivered</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="taxi">🚖 Taxi</button>
+                        <button class="filter-btn text-xs bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full" data-filter="delivery">📦 Delivery</button>
+                    </div>
+                    <div id="adminRequestsList" class="max-h-64 overflow-auto"></div>
+                </div>
+                <div class="card p-4"><h3 class="font-semibold">${t('userManagement')}</h3><div id="userManagementList"></div></div>
+            </div>`;
+        document.getElementById('adminLogout').onclick=async()=>{await signOut(auth); currentUser=null; renderLogin();};
+        document.getElementById('refreshBtn').onclick=()=>{listenRequests(); Swal.fire({title:'Refreshed!',icon:'success',timer:800});};
+        document.getElementById('modeToggle').onclick=()=>{document.body.classList.toggle('light'); localStorage.setItem('lightMode',document.body.classList.contains('light')); renderAdminPanel();};
+        document.getElementById('langSelectHeader')?.addEventListener('change', (e) => {
+            const lang = e.target.value;
+            if (translations[lang]) {
+                currentLang = lang;
+                localStorage.setItem('lang', lang);
+                if (currentUser) {
+                    setDoc(doc(db, "userPreferences", currentUser.uid), { language: lang }, { merge: true });
+                }
+                renderAdminPanel();
+            }
+        });
+        document.getElementById('syncBtn')?.addEventListener('click', syncData);
+        
+        new Chart(document.getElementById('revenueChart'),{type:'line',data:{labels:Object.keys(byDay),datasets:[{label:'Revenue (ZMW)',data:Object.values(byDay),borderColor:'var(--primary)',fill:false}]}});
+
+        let currentFilter = 'all';
+        function renderFilteredRequests() {
+            const filtered = currentFilter === 'all' ? allRequests : allRequests.filter(r => {
+                if (currentFilter === 'taxi' || currentFilter === 'delivery') return r.type === currentFilter;
+                return r.status === currentFilter;
+            });
+            document.getElementById('adminRequestsList').innerHTML = filtered.map(r => {
+                const td = r.tripNumber ? `#${r.tripNumber}` : `#${r.id.substring(0,6)}`;
+                return `<div class="border-b py-1 text-sm flex justify-between items-center">
+                    <span>${td} ${r.type} – ${r.status} – ${CURRENCY}${r.price}${r.promoCode ? ` ✨${r.promoCode}` : ''}</span>
+                    <span class="text-xs text-gray-400">${r.customerName}</span>
+                </div>`;
+            }).join('');
+        }
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentFilter = btn.dataset.filter;
+                renderFilteredRequests();
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('bg-primary-light'));
+                btn.classList.add('bg-primary-light');
+            });
+        });
+        renderFilteredRequests();
+
+        const userMgmt=document.getElementById('userManagementList');
+        const allUsers=await getDocs(collection(db,"users"));
+        userMgmt.innerHTML='';
+        for(const u of allUsers.docs){const data=u.data(); 
+            const isDriver = data.role === 'driver';
+            const driverEarnings = isDriver ? allRequests.filter(r => r.driverId === u.id && r.status === 'delivered').reduce((s,r) => s + r.price, 0) : 0;
+            userMgmt.innerHTML+=`<div class="border-b py-1 flex justify-between items-center flex-wrap"><span>${data.email} (${data.role})${isDriver ? ` 💰${CURRENCY}${driverEarnings.toFixed(2)}` : ''}</span><div><button class="suspendBtn text-red-500 text-xs" data-uid="${u.id}">${t('suspend')}</button> <button class="resetBtn text-blue-500 text-xs" data-email="${data.email}">${t('reset')}</button></div></div>`;
+        }
+        document.querySelectorAll('.suspendBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo',t('suspend')+' (simulated)','info')));
+        document.querySelectorAll('.resetBtn').forEach(b=>b.addEventListener('click',()=>Swal.fire('Demo',t('reset')+' (simulated)','info')));
+    }
+
+    // ---------- BOOT ----------
     onAuthStateChanged(auth, async (user) => {
         if (user) { currentUser = user; await loadUserData(currentUser.uid); await initNotifications(); startApp(); }
         else renderLogin();
