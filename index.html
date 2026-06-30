@@ -42,6 +42,7 @@
         .card { background: var(--card); border-color: var(--border); }
         .btn-primary { background: var(--primary); color: white; padding: 0.6rem 1.5rem; border-radius: 2rem; font-weight: 600; transition: background 0.2s; cursor: pointer; }
         .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
         .map-container { height: 280px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
@@ -111,7 +112,6 @@
     let customerMap, driverMap;
     let pickupMarker, dropoffMarker, driverMarker;
     let savedPlaces = [];
-    // recentPlaces removed
     let allRequests = [];
     let allRestaurants = [];
     let foodCart = [];
@@ -128,6 +128,7 @@
     let driverMarkerCust = null;
     let customerRouteLine = null;
     let routingControl = null;
+    let searchPerformed = false;   // flag to enable Request button
 
     const RATES = { taxi: { base: 25, perKm: 10 }, delivery: { base: 30, perKm: 12 } };
     const CURRENCY = "K";
@@ -138,7 +139,25 @@
     function formatTime(t) { if (!t) return ''; const d = t.toDate ? t.toDate() : new Date(t); return d.toLocaleTimeString('en-ZM',{hour:'2-digit',minute:'2-digit'}); }
     function haversine(lat1,lng1,lat2,lng2) { const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLng=(lng2-lng1)*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
     function estimateTime(dist) { const min=Math.round((dist/30)*60); if(min<1) return '1 min'; if(min<60) return min+' min'; const h=Math.floor(min/60); const m=min%60; return h+'h '+m+'min'; }
-    function autoPrice() { if(!tempPickup||!tempDropoff) return 0; const dist=haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng); let price=RATES[serviceType].base+dist*RATES[serviceType].perKm; const rounded=Math.round(price*2)/2; const pInput=document.getElementById('priceInput'); if(pInput) pInput.value=rounded; const dSpan=document.getElementById('distanceDisplay'); if(dSpan) dSpan.innerText=dist.toFixed(2)+' km'; const eSpan=document.getElementById('etaDisplay'); if(eSpan) eSpan.innerText=estimateTime(dist); const aSpan=document.getElementById('autoPriceDisplay'); if(aSpan) aSpan.innerText=`${CURRENCY}${rounded}`; const bSpan=document.getElementById('fareBreakdown'); if(bSpan) bSpan.innerText=`Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${rounded}`; return rounded; }
+    function calculatePrice(dist) { let price = RATES[serviceType].base + dist * RATES[serviceType].perKm; return Math.round(price * 2) / 2; }
+
+    // ---------- AUTO PRICE (updates UI) ----------
+    function updatePriceDisplay() {
+        if (!tempPickup || !tempDropoff) return;
+        const dist = haversine(tempPickup.lat, tempPickup.lng, tempDropoff.lat, tempDropoff.lng);
+        const price = calculatePrice(dist);
+        const pInput = document.getElementById('priceInput');
+        if (pInput) pInput.value = price;
+        const dSpan = document.getElementById('distanceDisplay');
+        if (dSpan) dSpan.innerText = dist.toFixed(2) + ' km';
+        const eSpan = document.getElementById('etaDisplay');
+        if (eSpan) eSpan.innerText = estimateTime(dist);
+        const aSpan = document.getElementById('autoPriceDisplay');
+        if (aSpan) aSpan.innerText = `${CURRENCY}${price}`;
+        const bSpan = document.getElementById('fareBreakdown');
+        if (bSpan) bSpan.innerText = `Base ${CURRENCY}${RATES[serviceType].base} + ${RATES[serviceType].perKm} × ${dist.toFixed(2)}km = ${CURRENCY}${price}`;
+        return { dist, price };
+    }
 
     function playNotificationSound() { try { const audioCtx=new(window.AudioContext||window.webkitAudioContext)(); const osc=audioCtx.createOscillator(); const gain=audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.value=800; osc.type='sine'; gain.gain.setValueAtTime(0.3,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime+0.4); } catch(e){} }
     function showNotification(title,body) { if(Notification.permission==='granted') new Notification(title,{body}); else Swal.fire({title,text:body,icon:'info',toast:true,position:'top-end',timer:4000}); }
@@ -180,7 +199,6 @@
         }
         const savedSnap=await getDoc(doc(db,"savedPlaces",uid));
         savedPlaces=savedSnap.exists()?savedSnap.data().places||[]:[];
-        // recentPlaces removed – no longer loaded
     }
 
     // ---------- LISTENERS ----------
@@ -423,7 +441,7 @@
     }
 
     // ============================================================
-    // =============== SIMPLIFIED CUSTOMER DASHBOARD ==============
+    // =============== CUSTOMER DASHBOARD =========================
     // ============================================================
     function renderCustomerTabs() {
         document.getElementById('appContainer').innerHTML = `
@@ -485,13 +503,12 @@
         updateNewOrderBadge();
     }
 
-    // =============== SIMPLIFIED MAP TAB (no "Where to?" & no recent places) ===============
+    // =============== SIMPLIFIED MAP TAB (with Search button) ===============
     function renderSimplifiedMapTab(container) {
         serviceType = 'delivery';
+        searchPerformed = false;
         const html = `
             <div class="space-y-3">
-                <!-- No "Where to?" search bar -->
-
                 <!-- Location cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div class="loc-card active-pickup" id="pickupCard">
@@ -515,13 +532,16 @@
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
 
-                <!-- Saved Places (only saved, no recent) -->
+                <!-- Saved Places (only saved) -->
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
+
+                <!-- Search button (new) -->
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700">🔍 Search</button>
 
                 <!-- Map -->
                 <div id="customerMap" class="map-container"></div>
 
-                <!-- Price & Route -->
+                <!-- Price & Route (updated by Search) -->
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
                     <div class="flex justify-between"><span>⏱️ ETA</span><span id="etaDisplay">—</span></div>
@@ -535,15 +555,17 @@
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full">Request</button>
+                <button id="publishBtn" class="btn-primary w-full" disabled>Request</button>
             </div>`;
         container.innerHTML = html;
+        // Attach map events (search, publish, etc.)
         attachMapEvents(container);
     }
 
     // =============== SIMPLIFIED RIDES TAB ===============
     function renderSimplifiedRidesTab(container) {
         serviceType = 'taxi';
+        searchPerformed = false;
         const html = `
             <div class="space-y-3">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -556,6 +578,7 @@
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
                 <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
+                <button id="searchBtn" class="btn-primary w-full bg-blue-600 hover:bg-blue-700">🔍 Search</button>
                 <div id="customerMap" class="map-container"></div>
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
@@ -568,20 +591,43 @@
                     <input type="number" id="priceInput" step="0.5" placeholder="Price (ZMW)" class="text-sm">
                 </div>
                 <select id="paymentSelect" class="text-sm">${PAYMENT_METHODS.map(p=>`<option>${p}</option>`).join('')}</select>
-                <button id="publishBtn" class="btn-primary w-full">Request Taxi</button>
+                <button id="publishBtn" class="btn-primary w-full" disabled>Request Taxi</button>
             </div>`;
         container.innerHTML = html;
         attachMapEvents(container);
     }
 
-    // ---------- SHARED MAP EVENTS (no main search) ----------
+    // ---------- SHARED MAP EVENTS ----------
     function attachMapEvents(container) {
         const pickupInput = document.getElementById('pickupInput');
         const dropoffInput = document.getElementById('dropoffInput');
         const pickupDropdown = document.getElementById('pickupDropdown');
         const dropoffDropdown = document.getElementById('dropoffDropdown');
+        const searchBtn = document.getElementById('searchBtn');
+        const publishBtn = document.getElementById('publishBtn');
 
-        async function performSearch(input, dropdown, mode) {
+        // ---- Search function ----
+        function performSearch() {
+            if (!tempPickup || !tempDropoff) {
+                Swal.fire('Missing locations', 'Please set both pickup and dropoff.', 'warning');
+                return;
+            }
+            const result = updatePriceDisplay();
+            if (result) {
+                searchPerformed = true;
+                publishBtn.disabled = false;
+                Swal.fire({
+                    title: 'Trip Approved!',
+                    html: `Distance: <strong>${result.dist.toFixed(2)} km</strong><br>ETA: <strong>${estimateTime(result.dist)}</strong><br>Price: <strong>${CURRENCY}${result.price}</strong>`,
+                    icon: 'success',
+                    timer: 3000,
+                    showConfirmButton: true
+                });
+            }
+        }
+
+        // ---- Autocomplete functions ----
+        async function performSearchInput(input, dropdown, mode) {
             const query = input.value.trim();
             if (query.length < 2) { dropdown.style.display = 'none'; return; }
             const results = await searchAddress(query);
@@ -599,6 +645,9 @@
                     setLocationForMode(mode, { lat, lng }, name);
                     input.value = name;
                     dropdown.style.display = 'none';
+                    // Reset search state
+                    searchPerformed = false;
+                    publishBtn.disabled = true;
                 });
             });
         }
@@ -608,14 +657,16 @@
             return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
         }
 
-        pickupInput.addEventListener('input', debounce(() => { setActiveMode('pickup'); performSearch(pickupInput, pickupDropdown, 'pickup'); }, 300));
-        dropoffInput.addEventListener('input', debounce(() => { setActiveMode('dropoff'); performSearch(dropoffInput, dropoffDropdown, 'dropoff'); }, 300));
+        pickupInput.addEventListener('input', debounce(() => { setActiveMode('pickup'); performSearchInput(pickupInput, pickupDropdown, 'pickup'); }, 300));
+        dropoffInput.addEventListener('input', debounce(() => { setActiveMode('dropoff'); performSearchInput(dropoffInput, dropoffDropdown, 'dropoff'); }, 300));
 
-        // Clear buttons
+        // Clear buttons reset search state
         document.getElementById('clearPickupInput').addEventListener('click', () => {
             pickupInput.value = '';
             tempPickup = null; tempPickupAddress = null;
-            updateLocationUI(); autoPrice();
+            updateLocationUI(); 
+            searchPerformed = false;
+            publishBtn.disabled = true;
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
             drawCustomerRoute();
             pickupDropdown.style.display = 'none';
@@ -623,12 +674,15 @@
         document.getElementById('clearDropoffInput').addEventListener('click', () => {
             dropoffInput.value = '';
             tempDropoff = null; tempDropoffAddress = null;
-            updateLocationUI(); autoPrice();
+            updateLocationUI();
+            searchPerformed = false;
+            publishBtn.disabled = true;
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
             drawCustomerRoute();
             dropoffDropdown.style.display = 'none';
         });
 
+        // Click on cards to set active mode
         document.getElementById('pickupCard').addEventListener('click', () => setActiveMode('pickup'));
         document.getElementById('dropoffCard').addEventListener('click', () => setActiveMode('dropoff'));
 
@@ -643,6 +697,9 @@
                     pickupInput.value = '📍 My location';
                     if (window.customerMap) window.customerMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
                     Swal.close();
+                    // Reset search
+                    searchPerformed = false;
+                    publishBtn.disabled = true;
                 }, () => { Swal.fire('Error', 'Could not get location', 'error'); });
             } else Swal.fire('Error', 'Geolocation not supported', 'error');
         });
@@ -654,7 +711,9 @@
             tempDropoff = tempP; tempDropoffAddress = tempA;
             pickupInput.value = tempPickupAddress || '';
             dropoffInput.value = tempDropoffAddress || '';
-            updateLocationUI(); autoPrice();
+            updateLocationUI();
+            searchPerformed = false;
+            publishBtn.disabled = true;
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker=null; }
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null; }
             if (tempPickup) pickupMarker = L.marker([tempPickup.lat,tempPickup.lng]).addTo(window.customerMap).bindTooltip('Pickup');
@@ -678,13 +737,19 @@
             Swal.fire({ title: 'Saved!', icon: 'success', timer: 1000 });
         });
 
-        // Publish
-        document.getElementById('publishBtn').onclick = async () => {
-            haptic();
+        // ---- Search button ----
+        searchBtn.addEventListener('click', performSearch);
+
+        // ---- Publish (Request) ----
+        publishBtn.addEventListener('click', async () => {
+            if (!searchPerformed) {
+                Swal.fire('Please search first', 'Click the Search button to approve the trip.', 'info');
+                return;
+            }
             if (!tempPickup || !tempDropoff) return Swal.fire('Error','Set both pickup and dropoff','warning');
             if (tempPickup.lat === tempDropoff.lat && tempPickup.lng === tempDropoff.lng) return Swal.fire('Same location');
             let price = parseFloat(document.getElementById('priceInput').value);
-            if (isNaN(price)) price = autoPrice() || 0;
+            if (isNaN(price)) price = calculatePrice(haversine(tempPickup.lat,tempPickup.lng,tempDropoff.lat,tempDropoff.lng));
             if (price <= 0) return Swal.fire('Invalid price');
             const detail = document.getElementById('cargoSelect').value;
             const payment = document.getElementById('paymentSelect').value;
@@ -721,15 +786,18 @@
                 pickupInput.value = ''; dropoffInput.value = '';
                 tempPickup = null; tempPickupAddress = null;
                 tempDropoff = null; tempDropoffAddress = null;
-                updateLocationUI(); autoPrice();
+                updateLocationUI();
+                searchPerformed = false;
+                publishBtn.disabled = true;
                 if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
                 if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
                 drawCustomerRoute();
             } catch(e) {
                 Swal.fire('Error', e.message, 'error');
             }
-        };
+        });
 
+        // Close dropdowns
         document.addEventListener('click', (e) => {
             if (!pickupInput.contains(e.target) && !pickupDropdown.contains(e.target)) pickupDropdown.style.display = 'none';
             if (!dropoffInput.contains(e.target) && !dropoffDropdown.contains(e.target)) dropoffDropdown.style.display = 'none';
@@ -740,7 +808,7 @@
         pickupInput.value = tempPickupAddress || '';
         dropoffInput.value = tempDropoffAddress || '';
         updateLocationUI();
-        if (tempPickup && tempDropoff) autoPrice();
+        if (tempPickup && tempDropoff) updatePriceDisplay();
     }
 
     // ---------- CORE LOCATION HELPERS ----------
@@ -760,7 +828,10 @@
             document.getElementById('pickupCard').classList.remove('active-pickup');
         }
         updateLocationUI();
-        autoPrice();
+        // Reset search state
+        searchPerformed = false;
+        const publishBtn = document.getElementById('publishBtn');
+        if (publishBtn) publishBtn.disabled = true;
         if (window.customerMap) {
             if (pickupMarker && tempPickup) { pickupMarker.setLatLng([tempPickup.lat, tempPickup.lng]); }
             else if (tempPickup) { pickupMarker = L.marker([tempPickup.lat, tempPickup.lng]).addTo(window.customerMap).bindTooltip('Pickup'); }
@@ -840,7 +911,7 @@
         }
     }
 
-    // ---------- SAVED PLACES (no recent) ----------
+    // ---------- SAVED PLACES ----------
     async function renderSavedPlaces() {
         const container = document.getElementById('savedPlacesList');
         if (!container) return;
@@ -870,6 +941,8 @@
 
     function escapeHtml(str){return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 
+    // ---------- FOOD, SHOPS, CARGO, NAVIGATION, HISTORY (unchanged) ----------
+    // (These functions are identical to the previous version, I'll include them in the final answer)
     // ---------- FOOD TAB ----------
     function renderCustomerFoodTab(container) {
         const loadRestaurants = async () => {
@@ -1182,7 +1255,12 @@
         getFoodOrders();
     }
 
-    // ========== DRIVER DASHBOARD ==========
+    // ========== DRIVER DASHBOARD (unchanged) ==========
+    // ... (driver and admin functions remain identical to previous version)
+    // For brevity, I'll include them in the final code block.
+    // They are copied exactly from the last working version.
+
+    // ---------- DRIVER DASHBOARD ----------
     function renderDriverTabs() {
         const completed = allRequests.filter(r => r.driverId === currentUser.uid && r.status === 'delivered');
         const total = completed.reduce((s,r) => s + r.price, 0);
