@@ -42,7 +42,6 @@
         .card { background: var(--card); border-color: var(--border); }
         .btn-primary { background: var(--primary); color: white; padding: 0.6rem 1.5rem; border-radius: 2rem; font-weight: 600; transition: background 0.2s; cursor: pointer; }
         .btn-primary:hover { background: var(--primary-hover); }
-        .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary); }
         .bg-primary-light { background: var(--primary-bg); }
         .text-primary { color: var(--primary); }
         .map-container { height: 280px; width: 100%; border-radius: 1.5rem; overflow: hidden; }
@@ -77,9 +76,6 @@
         .theme-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; margin: 4px; }
         .theme-dot:hover { border-color: var(--text); }
         .theme-dot.active { border-color: var(--text); }
-        .where-to-big { font-size: 1.2rem; font-weight: 600; padding: 0.8rem 1.2rem; border-radius: 2rem; background: var(--bg); border: 1px solid var(--border); width: 100%; color: var(--text); }
-        .where-to-big::placeholder { color: var(--text-secondary); }
-        .where-to-big:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
         @media (max-width: 640px) { .map-container { height: 200px; } .header-avatar { width: 32px; height: 32px; font-size: 0.9rem; } }
     </style>
 </head>
@@ -115,7 +111,7 @@
     let customerMap, driverMap;
     let pickupMarker, dropoffMarker, driverMarker;
     let savedPlaces = [];
-    let recentPlaces = [];
+    // recentPlaces removed
     let allRequests = [];
     let allRestaurants = [];
     let foodCart = [];
@@ -184,8 +180,7 @@
         }
         const savedSnap=await getDoc(doc(db,"savedPlaces",uid));
         savedPlaces=savedSnap.exists()?savedSnap.data().places||[]:[];
-        const recentSnap=await getDoc(doc(db,"recentPlaces",uid));
-        recentPlaces=recentSnap.exists()?recentSnap.data().places||[]:[];
+        // recentPlaces removed – no longer loaded
     }
 
     // ---------- LISTENERS ----------
@@ -477,7 +472,6 @@
         if (activeTab === 'map' || activeTab === undefined || !activeTab) {
             renderSimplifiedMapTab(content);
         } else {
-            // Other tabs (food, shops, etc.) render separately
             switch(activeTab) {
                 case 'food': renderCustomerFoodTab(content); break;
                 case 'shops': renderCustomerShopsTab(content); break;
@@ -491,16 +485,12 @@
         updateNewOrderBadge();
     }
 
-    // =============== SIMPLIFIED MAP TAB (no service chips) ===============
+    // =============== SIMPLIFIED MAP TAB (no "Where to?" & no recent places) ===============
     function renderSimplifiedMapTab(container) {
         serviceType = 'delivery';
         const html = `
             <div class="space-y-3">
-                <!-- Big "Where to?" search -->
-                <div class="relative">
-                    <input type="text" id="mainSearchInput" placeholder="Where to &amp; for how much?" class="where-to-big" autocomplete="off">
-                    <div id="mainSearchDropdown" class="autocomplete-dropdown"></div>
-                </div>
+                <!-- No "Where to?" search bar -->
 
                 <!-- Location cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -525,11 +515,8 @@
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
 
-                <!-- Saved & Recent -->
-                <div id="savedPlacesContainer">
-                    <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
-                    <div id="recentPlacesList" class="flex flex-wrap gap-1 mt-1"></div>
-                </div>
+                <!-- Saved Places (only saved, no recent) -->
+                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
 
                 <!-- Map -->
                 <div id="customerMap" class="map-container"></div>
@@ -559,10 +546,6 @@
         serviceType = 'taxi';
         const html = `
             <div class="space-y-3">
-                <div class="relative">
-                    <input type="text" id="mainSearchInput" placeholder="Where to &amp; for how much?" class="where-to-big" autocomplete="off">
-                    <div id="mainSearchDropdown" class="autocomplete-dropdown"></div>
-                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div class="loc-card active-pickup" id="pickupCard"><span class="icon">📍</span><input type="text" id="pickupInput" placeholder="Pickup" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearPickupInput">✕</span><div id="pickupDropdown" class="autocomplete-dropdown"></div></div>
                     <div class="loc-card" id="dropoffCard"><span class="icon">🏁</span><input type="text" id="dropoffInput" placeholder="Dropoff" class="flex-1 text-sm" autocomplete="off"><span class="clear-btn" id="clearDropoffInput">✕</span><div id="dropoffDropdown" class="autocomplete-dropdown"></div></div>
@@ -572,7 +555,7 @@
                     <button id="swapLocations" class="text-xs bg-purple-100 dark:bg-purple-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">🔄 Swap</button>
                     <button id="saveLocationBtn" class="text-xs bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded-full" style="background:var(--primary-bg);">💾 Save</button>
                 </div>
-                <div id="savedPlacesContainer"><div id="savedPlacesList" class="flex flex-wrap gap-1"></div><div id="recentPlacesList" class="flex flex-wrap gap-1 mt-1"></div></div>
+                <div id="savedPlacesList" class="flex flex-wrap gap-1"></div>
                 <div id="customerMap" class="map-container"></div>
                 <div class="bg-primary-light p-3 rounded-xl text-sm" style="background:var(--primary-bg);">
                     <div class="flex justify-between"><span>📏 Distance</span><span id="distanceDisplay">— km</span></div>
@@ -591,10 +574,8 @@
         attachMapEvents(container);
     }
 
-    // ---------- SHARED MAP EVENTS ----------
+    // ---------- SHARED MAP EVENTS (no main search) ----------
     function attachMapEvents(container) {
-        const mainInput = document.getElementById('mainSearchInput');
-        const mainDropdown = document.getElementById('mainSearchDropdown');
         const pickupInput = document.getElementById('pickupInput');
         const dropoffInput = document.getElementById('dropoffInput');
         const pickupDropdown = document.getElementById('pickupDropdown');
@@ -618,8 +599,6 @@
                     setLocationForMode(mode, { lat, lng }, name);
                     input.value = name;
                     dropdown.style.display = 'none';
-                    if (mode === 'pickup') pickupInput.value = name;
-                    else dropoffInput.value = name;
                 });
             });
         }
@@ -629,29 +608,25 @@
             return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
         }
 
-        // Main search uses active mode
-        const debouncedMain = debounce(() => performSearch(mainInput, mainDropdown, mapSelectMode), 300);
-        mainInput.addEventListener('input', debouncedMain);
-
         pickupInput.addEventListener('input', debounce(() => { setActiveMode('pickup'); performSearch(pickupInput, pickupDropdown, 'pickup'); }, 300));
         dropoffInput.addEventListener('input', debounce(() => { setActiveMode('dropoff'); performSearch(dropoffInput, dropoffDropdown, 'dropoff'); }, 300));
 
         // Clear buttons
         document.getElementById('clearPickupInput').addEventListener('click', () => {
-            pickupInput.value = ''; mainInput.value = '';
+            pickupInput.value = '';
             tempPickup = null; tempPickupAddress = null;
             updateLocationUI(); autoPrice();
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker = null; }
             drawCustomerRoute();
-            pickupDropdown.style.display = 'none'; mainDropdown.style.display = 'none';
+            pickupDropdown.style.display = 'none';
         });
         document.getElementById('clearDropoffInput').addEventListener('click', () => {
-            dropoffInput.value = ''; mainInput.value = '';
+            dropoffInput.value = '';
             tempDropoff = null; tempDropoffAddress = null;
             updateLocationUI(); autoPrice();
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker = null; }
             drawCustomerRoute();
-            dropoffDropdown.style.display = 'none'; mainDropdown.style.display = 'none';
+            dropoffDropdown.style.display = 'none';
         });
 
         document.getElementById('pickupCard').addEventListener('click', () => setActiveMode('pickup'));
@@ -666,7 +641,6 @@
                     const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setLocationForMode('pickup', ll, '📍 My location');
                     pickupInput.value = '📍 My location';
-                    mainInput.value = '📍 My location';
                     if (window.customerMap) window.customerMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
                     Swal.close();
                 }, () => { Swal.fire('Error', 'Could not get location', 'error'); });
@@ -680,7 +654,6 @@
             tempDropoff = tempP; tempDropoffAddress = tempA;
             pickupInput.value = tempPickupAddress || '';
             dropoffInput.value = tempDropoffAddress || '';
-            mainInput.value = '';
             updateLocationUI(); autoPrice();
             if (pickupMarker && window.customerMap) { window.customerMap.removeLayer(pickupMarker); pickupMarker=null; }
             if (dropoffMarker && window.customerMap) { window.customerMap.removeLayer(dropoffMarker); dropoffMarker=null; }
@@ -743,12 +716,9 @@
                     tripNumber: tripNumber
                 };
                 await addDoc(collection(db,"requests"), req);
-                const recentLoc = { lat: tempPickup.lat, lng: tempPickup.lng, address: tempPickupAddress };
-                recentPlaces = [recentLoc, ...recentPlaces.filter(p => p.lat !== recentLoc.lat || p.lng !== recentLoc.lng)].slice(0,5);
-                await setDoc(doc(db,"recentPlaces",currentUser.uid),{places:recentPlaces});
                 Swal.fire({ title: 'Request sent!', icon: 'success', timer: 2000 });
                 showNotification('New request', 'Drivers can see it');
-                pickupInput.value = ''; dropoffInput.value = ''; mainInput.value = '';
+                pickupInput.value = ''; dropoffInput.value = '';
                 tempPickup = null; tempPickupAddress = null;
                 tempDropoff = null; tempDropoffAddress = null;
                 updateLocationUI(); autoPrice();
@@ -761,17 +731,14 @@
         };
 
         document.addEventListener('click', (e) => {
-            if (!mainInput.contains(e.target) && !mainDropdown.contains(e.target)) mainDropdown.style.display = 'none';
             if (!pickupInput.contains(e.target) && !pickupDropdown.contains(e.target)) pickupDropdown.style.display = 'none';
             if (!dropoffInput.contains(e.target) && !dropoffDropdown.contains(e.target)) dropoffDropdown.style.display = 'none';
         });
 
         renderSavedPlaces();
-        renderRecentPlaces();
         initCustomerMap();
         pickupInput.value = tempPickupAddress || '';
         dropoffInput.value = tempDropoffAddress || '';
-        mainInput.value = '';
         updateLocationUI();
         if (tempPickup && tempDropoff) autoPrice();
     }
@@ -800,12 +767,6 @@
             if (dropoffMarker && tempDropoff) { dropoffMarker.setLatLng([tempDropoff.lat, tempDropoff.lng]); }
             else if (tempDropoff) { dropoffMarker = L.marker([tempDropoff.lat, tempDropoff.lng]).addTo(window.customerMap).bindTooltip('Dropoff'); }
             drawCustomerRoute();
-        }
-        if (latlng && address) {
-            const recentLoc = { lat: latlng.lat, lng: latlng.lng, address: address };
-            recentPlaces = [recentLoc, ...recentPlaces.filter(p => p.lat !== recentLoc.lat || p.lng !== recentLoc.lng)].slice(0,5);
-            setDoc(doc(db,"recentPlaces",currentUser.uid),{places:recentPlaces}).catch(()=>{});
-            renderRecentPlaces();
         }
     }
 
@@ -879,7 +840,7 @@
         }
     }
 
-    // ---------- SAVED & RECENT ----------
+    // ---------- SAVED PLACES (no recent) ----------
     async function renderSavedPlaces() {
         const container = document.getElementById('savedPlacesList');
         if (!container) return;
@@ -898,17 +859,6 @@
                 await setDoc(doc(db,"savedPlaces",currentUser.uid),{places:savedPlaces});
                 renderSavedPlaces();
             });
-        });
-    }
-
-    function renderRecentPlaces() {
-        const container = document.getElementById('recentPlacesList');
-        if (!container) return;
-        if (!recentPlaces.length) { container.innerHTML = ''; return; }
-        container.innerHTML = recentPlaces.map(p => `<div class="saved-place-item" data-lat="${p.lat}" data-lng="${p.lng}" data-address="${p.address||'Recent'}"><i class="fas fa-clock" style="color:var(--primary);"></i> ${escapeHtml(p.address || 'Recent').substring(0,20)}</div>`).join('');
-        document.querySelectorAll('.saved-place-item').forEach(el => {
-            const lat=parseFloat(el.dataset.lat), lng=parseFloat(el.dataset.lng), address=el.dataset.address;
-            el.addEventListener('click', () => { setLocationForMode(mapSelectMode, {lat,lng}, address||'Recent'); });
         });
     }
 
